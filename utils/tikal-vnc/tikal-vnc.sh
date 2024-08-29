@@ -53,5 +53,7 @@ openssl genrsa -out $TLS_KEY 2048
 openssl req -new -key $TLS_KEY -out $TLS_CSR
 openssl x509 -req -days 365 -signkey $TLS_KEY -in $TLS_CSR -out $TLS_CRT
 
-LD_PRELOAD=libpam_wrapper.so:pam_matrix.so PAM_WRAPPER=1 PAM_WRAPPER_SERVICE_DIR=$PAM_DIR weston -B vnc -S $wayland_display \
-	--backend=vnc --vnc-tls-key=$TLS_KEY --vnc-tls-cert=$TLS_CRT --port 3000 --renderer gl
+# LD_PRELOAD=libpam_wrapper.so:pam_matrix.so PAM_WRAPPER=1 PAM_WRAPPER_SERVICE_DIR=$PAM_DIR weston -B vnc -S $wayland_display \
+#	--backend=vnc --vnc-tls-key=$TLS_KEY --vnc-tls-cert=$TLS_CRT --port 3000 --renderer gl
+
+weston

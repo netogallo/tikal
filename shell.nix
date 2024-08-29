@@ -6,8 +6,5 @@ let
   inherit (nixpkgs) mkShellNoCC;
 in
 {
-  tikal-vnc = mkShellNoCC {
-    name = "tikal-vnc-shell";
-    buildInputs = [ utils.tikal-vnc ];
-  };
+  tikal-vnc = tikal.callPackage ./utils/tikal-vnc.shell.nix {};
 }
