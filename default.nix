@@ -7,11 +7,4 @@
     }
   ) {}
 }:
-let tikal = rec {
-  inherit tikal nixpkgs;
-  callPackage = nixpkgs.newScope { inherit tikal; };
-  utils = callPackage ./utils/default.nix {};
-  users = callPackage ./users/default.nix {};
-  };
-in
-tikal
+import ./tikal-base/prim/core.nix { inherit nixpkgs; }
