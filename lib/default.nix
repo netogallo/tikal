@@ -145,24 +145,24 @@ let
   };
 
   isType = {
-    __begin = "isType";
+    # begin isType
     
     __description = ''
     This function checks if the input type matches the type of the value.
     '';
     
     __functor = self: t: x: typeOf x == t;
-    __end = "isType";
+
+    # end isType
   };
 
   project = {
-    __begin = "select";
+    # begin project;
     
-    __description =
-    ''
-    This function accepts a attribute set with boolan fields and an object. The
-    true/false value, known as the strictness, indicates whether the function
-    should fail if the attribute is missing or just return null.
+    __description = ''
+      This function accepts a attribute set with boolan fields and an object. The
+      true/false value, known as the strictness, indicates whether the function
+      should fail if the attribute is missing or just return null.
     '';
     
     __functor = self: paths: input:
@@ -198,9 +198,15 @@ let
       };
     };
     
-    __end = "select";
+    # end project
   };
 in
 {
-  inherit compose findPaths getAttrDeep project setAttrDeep tests;
+  inherit
+    compose
+    findPaths
+    getAttrDeep getAttrDeepPoly
+    project
+    setAttrDeep
+    tests;
 }
