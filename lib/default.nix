@@ -1,15 +1,34 @@
 {
+  tikal ? import ../default.nix {}
 }:
 let
   inherit (builtins) concatMap elem filter foldl' hasAttr length head tail getAttr attrNames typeOf;
-  getAttrDeep = path: obj:
-    let
-      cata = s: a:
-        if s == null || !(hasAttr a s)
-	then null
-	else getAttr a s;
-    in
-      builtins.foldl' cata obj path;
+  inherit (tikal.nixpkgs.lib) concatStringsSep;
+  getAttrDeepPoly = {
+    __begin = "getAttrDeepPoly";
+
+    __description = ''
+    Given an attribute path represented as a list of strings, this function will
+    get that attribute from the input object. If the attribute is not found, the
+    result will depend on how the strict parameter is set.
+    '';
+
+    __functor = self: { strict ? false }: path: obj:
+      let
+        path-str = concatStringsSep "." path;
+        empty = if strict then throw "Attribute '${path-str}' not in object." else null;
+        cata = s: a:
+          if s == null || !(hasAttr a s)
+	        then empty
+	        else getAttr a s;
+      in
+        builtins.foldl' cata obj path;
+
+    __end = "getAttrDeepPoly";
+  };
+
+  getAttrDeep = getAttrDeepPoly { strict = false; };
+
   setAttrDeep = path: obj: value:
     let
       attr = head path;
@@ -80,52 +99,108 @@ let
       paths = findPaths isPatch patches;
       patchPath = path: {path = path; result = applyPatch (getAttrDeep path patches) (getAttrDeep path value);};
       updates = map patchPath paths;
-   in
-     foldl' (s: {path, result}: setAttrDeep path s result) value updates;
-
+    in
+      foldl' (s: {path, result}: setAttrDeep path s result) value updates;
   tests = {
-     setAttrDeep = {
-       test1 =
-       let
-         path = ["a" "b" "c"];
-         value = x: { a = { b = { c = x;}; x = 6;}; r = 7;};
-       in
-       rec {
-         expected = value 5;
-	 actual = setAttrDeep path (value 9) 5;
-	 result = expected == actual;
+    setAttrDeep = {
+      test1 =
+      let
+        path = ["a" "b" "c"];
+        value = x: { a = { b = { c = x;}; x = 6;}; r = 7;};
+      in
+        rec {
+          expected = value 5;
+	        actual = setAttrDeep path (value 9) 5;
+	        result = expected == actual;
        };
-     };
-     findPaths = {
-       test1 =
-       let
-         obj = {a = { b = 5;}; c = 7; d = { e = 2; g = 8;};};
-       in
-       rec {
-         expected = [ ["c"] ["a" "b"] ["d" "g"] ];
-	 actual = findPaths (x: builtins.typeOf x == "int" && x > 3) obj;
-	 result = expected == actual;
-       };
-     };
-     modify = {
-       test1 = rec {
-         patches = {x = {y = old: 5;}; z = { w = old: old + 7; };};
-	 input = {z = { w = 5;};};
-         expected = {x = {y = 5;}; z = {w = 12;};};
-	 actual = modify patches input;
-	 result = expected == actual;
-       };
-     };
-     compose = {
-       test1 = rec {
-          input = [ (x: x + 2) (x: x + x) ];
-	  expected = 5;
-	  actual = compose input 8;
-	  result = expected == actual;
-       };
-     };
+    };
+    findPaths = {
+      test1 =
+      let
+        obj = {a = { b = 5;}; c = 7; d = { e = 2; g = 8;};};
+      in
+        rec {
+          expected = [ ["c"] ["a" "b"] ["d" "g"] ];
+	        actual = findPaths (x: builtins.typeOf x == "int" && x > 3) obj;
+	        result = expected == actual;
+        };
+    };
+    modify = {
+      test1 = rec {
+        patches = {x = {y = old: 5;}; z = { w = old: old + 7; };};
+	      input = {z = { w = 5;};};
+        expected = {x = {y = 5;}; z = {w = 12;};};
+	      actual = modify patches input;
+	      result = expected == actual;
+      };
+    };
+    compose = {
+      test1 = rec {
+        input = [ (x: x + 2) (x: x + x) ];
+	      expected = 5;
+	      actual = compose input 8;
+	      result = expected == actual;
+      };
+    };
+  };
+
+  isType = {
+    __begin = "isType";
+    
+    __description = ''
+    This function checks if the input type matches the type of the value.
+    '';
+    
+    __functor = self: t: x: typeOf x == t;
+    __end = "isType";
+  };
+
+  project = {
+    __begin = "select";
+    
+    __description =
+    ''
+    This function accepts a attribute set with boolan fields and an object. The
+    true/false value, known as the strictness, indicates whether the function
+    should fail if the attribute is missing or just return null.
+    '';
+    
+    __functor = self: paths: input:
+      let
+        matched-paths = findPaths (all [ (isType "bool") ]) paths;
+        strict-attrs = map make-strict (filter (a: getAttrDeep a paths) matched-paths);
+        loose-attrs = map make-loose (filter (a: !(getAttrDeep a paths)) matched-paths);
+        make-strict = attr: s:
+          let
+            value = getAttrDeepPoly { strict = true; } attr input;
+          in
+            setAttrDeep attr s value;
+
+        make-loose = attr: s:
+          let
+            value = getAttrDeepPoly { strict = false; } attr input;
+          in
+            setAttrDeep attr s value;
+      in
+        foldl'
+          (s: f: f s)
+          {}
+          (strict-attrs ++ loose-attrs)
+    ;
+
+    __tests = {
+      "It returns an object when supplied with a selection mask." = rec {
+        paths = { a = true; b = { c = true; d = true; }; c = false; };
+        input = { a = 5; b = { c = 7; d = 9; }; };
+        expected = { a = 5; b = { c = 7; d = 9; }; c = null; };
+        actual = project paths input;
+        result = expected == actual;
+      };
+    };
+    
+    __end = "select";
   };
 in
 {
-  inherit compose findPaths getAttrDeep setAttrDeep tests;
+  inherit compose findPaths getAttrDeep project setAttrDeep tests;
 }
