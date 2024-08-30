@@ -10,6 +10,7 @@
 let tikal = rec {
   inherit tikal nixpkgs;
   callPackage = nixpkgs.newScope { inherit tikal; };
+  lib = callPackage ./lib/default.nix {};
   utils = callPackage ./utils/default.nix {};
   users = callPackage ./users/default.nix {};
   };
