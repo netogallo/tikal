@@ -26,6 +26,26 @@ let
       stdenv.mkDerivation (args // defaults)
   ;
 
+  # Hand rolled instances. These are used internally
+  # in this module to create the base types.
+  Derivation = {
+
+    name = "Derivation";
+
+    module = "";
+
+    __description = ''
+      Creates a instance given a primitive nix derivation.
+    '';
+
+    __functor = self: { prim-derivation }:
+      {
+        __prim = { };
+
+        to-derivation = prim-derivation;
+      };
+  };
+
   type-instance-prim =
     let
       args = rec {
@@ -184,9 +204,79 @@ let
 
     #end constructor
   };
+
+  tikal-sha256sum = nixpkgs.writeShellApplication {
+    name = "tikal-sha256sum";
+
+    runtimeInputs = [ curl w3m ];
+
+    text = ''
+      # Todo: construct a merkel tree rather than this dodgey hashing
+
+      hashes=$(sha256sum $@ -type f | xargs -I{} sha256sum {} | cut -d ' ' -f1)
+      echo $hashes | sha256sum | cut -d ' ' -f1
+    '';
+  };
+
+  tikal-module-template = stdenv.textFile {
+    name = "tikal-module.nix.tpl";
+    text = ''
+    {
+      uid = "$uid";
+      paths = [
+    $paths
+      ];
+    }
+    '';
+  };
+
+  module-base-derivation = {
+
+    __description = ''
+      Creates a derivation for a module. The base derivation will contain
+      a directory with all of the types within the module. In addition to
+      all this, it will contain a few files with metadata including:
+        - A file with a unique identifier for the module computed
+          by hashing all of its files.
+        - A file listing all types in the module.
+    '';
+
+    __functor = self: root: { name ? "tikal-user-module" }:
+      stdenv.mkDerivation {
+        inherit name;
+        src = root;
+        dontUnpack = true;
+
+        nativeBuildInputs = [ envsubst tikal-sha256Sum ];
+
+        buildPhase = ''
+          uid=$(tikal-sha256sum ./)
+          paths=$(find ./ -type f -name '*.nix' | xargs -I{} echo {} | sed s/.*/\ \ \ \ \&/)
+
+          # todo: generate Haskell files for hoogle indexing.
+          uid=$uid path=$path envsubst -i ${tikal-module-template} > ./tikal-module.nix
+        '';
+      };
+  };
 in
 {
   inherit call-prim call-prim-lib;
+  
+  new-module = {
+
+    __description = ''
+    Create a new Tikal module. The module's root is the directory
+    provided as argument to this function.
+    '';
+
+    __functor = self: root: {}:
+      let
+      in
+      {}
+    ;
+
+  };
+
   new-type =
     #begin new-type
     name:

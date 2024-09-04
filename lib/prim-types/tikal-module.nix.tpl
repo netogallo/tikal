@@ -1,0 +1,6 @@
+{
+  uid = "$uid";
+  paths = [
+$paths[*]
+  ];
+}

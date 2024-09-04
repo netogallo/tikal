@@ -4,7 +4,8 @@
 let
   inherit (tikal) callPackage;
 in
-{
+rec {
   prim-lib = callPackage ./prim-lib.nix {};
-  types = callPackage ./types.nix {};
+  prim-types = callPackage ./prim-types/default.nix {};
+  base = prim-types.new-module ../tikal-base {};
 }
