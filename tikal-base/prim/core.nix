@@ -139,6 +139,71 @@
         ;
       };
 
+      type-meta-tpl = nixpkgs.writeTextFile {
+        name = "tikal.json.tpl";
+        text = ''
+          {
+            "uid": "$uid"
+          }
+        '';
+      };
+
+      type-builder = rec {
+
+        __description = ''
+          Function used to declare new types. It must be provided with a "package"
+          derivation representing the package where the type will be created. This
+          is usually supplied automatically when loading the module as Tiakl always
+          knows to which package a module belongs to.
+        '';
+
+        type-derivation = { name, module, package }:
+          let
+            type-src = nixpkgs.writeTextFile {
+              name = "${name}.hs";
+              text = ''
+                module ${module}.${name} where
+
+                package :: String
+                package = "${package}"
+
+                data ${name} = ${name}
+              '';
+              destination = "/${name}.hs";
+            };
+          in
+          stdenv.mkDerivation {
+            inherit name module package;
+            src = nixpkgs.symlinkJoin {
+              inherit name;
+              paths = [ type-src ];
+            };
+            nativeBuildInputs = with nixpkgs; [ envsubst hash-package ];
+            dontUnpack = true;
+            # todo: type-check the Haskell file.
+            dontBuild = true;
+            installPhase = ''
+              mkdir -p $out
+              cp ./* $out
+              uid=$(hash-package $out)
+              uid=$uid envsubst -i ${type-meta-tpl} > $out/tikal.json
+            '';
+          }
+        ;
+
+        __functor = self: { module, package, ...}: { name, ... }@type-decl:
+          let
+            drv = type-derivation {
+              inherit name module package;
+            };
+            meta = builtins.fromJSON (builtins.readFile "${drv}/tikal.json");
+          in
+          {
+            "${meta.uid}" = drv; 
+          }
+        ;
+      };
+
       package-from-derivation = {
 
         __description = ''
@@ -149,10 +214,21 @@
           let
             package-meta = import "${package-drv}/${tikal-package-file}";
             load-module = { uid, path }:
+              let
+                module-name = module-name-from-path { inherit path; };
+                module-meta = {
+                  package = package-drv;
+                  module = module-name;
+                };
+              in
               {
                 inherit uid;
-                name = module-name-from-path { inherit path; };
-                module = tikal.load-module "${package-drv}/${path}" {};
+                name = module-name;
+                module =
+                  tikal.load-module
+                    "${package-drv}/${path}"
+                    { type = type-builder module-meta; }
+                ;
               };
             modules = map load-module package-meta.modules;
             package-base = {
