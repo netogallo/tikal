@@ -4,6 +4,12 @@
 let
   inherit (builtins) concatMap elem filter foldl' hasAttr length head tail getAttr attrNames typeOf;
   inherit (nixpkgs.lib) concatStringsSep splitString;
+
+  to-list-path = path:
+    if typeOf path == "string"
+    then splitString "." path
+    else path;
+
   getAttrDeepPoly = {
     __begin = "getAttrDeepPoly";
 
@@ -13,8 +19,9 @@ let
     result will depend on how the strict parameter is set.
     '';
 
-    __functor = self: { strict ? false }: path: obj:
+    __functor = self: { strict ? false }: path-any: obj:
       let
+        path = to-list-path path-any;
         path-str = concatStringsSep "." path;
         empty = if strict then throw "Attribute '${path-str}' not in object." else null;
         cata = s: a:
@@ -31,10 +38,7 @@ let
 
   setAttrDeep = pathAny: obj: value:
     let
-      path =
-        if typeOf pathAny == "string"
-        then splitString "." pathAny
-        else pathAny;
+      path = to-list-path pathAny;
       attr = head path;
       rest = tail path;
       next =

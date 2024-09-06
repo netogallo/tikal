@@ -78,6 +78,7 @@
             installPhase = ''
               mkdir -p $out
               uid=$(hash-package $src)
+              uid="$uid-tikal-base"
               uid=$uid envsubst -i ${src}/tikal.json > $out/tikal.json
             '';
           };
@@ -112,27 +113,28 @@
                 
             merge-member = self: others:
               let
-                contexts = map (x: x."${tikal-base.uid}") ([self] ++ others);
+                items-to-merge = [self] ++ others;
+                contexts = map (x: x."${tikal-base.uid}") items-to-merge;
                 context = merge-tikal-contexts contexts;
                 new-value =
                   add-exports (
                     builtins.foldl'
                       (s: v: v // s)
                       { "${tikal-base.uid}" = context; }
-                      others
+                      items-to-merge
                   ); 
                 in
                   add-members new-value;
             set-exports-member = self: exports:
               let
-                new-value =
-                  add-exports (
-                    prim-lib.setAttrDeep
-                      [ tikal-base.uid "exports" ]
-                      self
-                      exports
-                  )
+                new-self =
+                  prim-lib.setAttrDeep
+                    [ tikal-base.uid "exports" ]
+                    self
+                    exports
                 ;
+ 
+                new-value = add-exports new-self;
               in
                 add-members new-value
             ;
@@ -161,7 +163,7 @@
             extend-attributes = state: { uid, path }:
               let
                 member = value."${uid}";
-                item = prim-lib.getAttrDeep path member;
+                item = prim-lib.getAttrDeepPoly { strict = true; } path member;
               in
               prim-lib.setAttrDeep path state item
             ;
@@ -177,7 +179,8 @@
         runtimeInputs = [ hash-file ];
         text = ''
           uid=$(hash-file "$1")
-          echo "    { uid = \"$uid\"; path = \"$1\"; }"
+          name=$(basename "$1" | sed 's/\./-/g')
+          echo "    { uid = \"$uid-$name\"; path = \"$1\"; }"
         '';
       };
 
@@ -251,22 +254,6 @@
           builtins.replaceStrings ["./" "/" ".nix"] ["" "." ""] path
         ;
 
-      };
-
-      add-modules = {
-
-        __description = ''
-          Extend the given attribute set with all the modules provided as arguments.
-          The result will contain additional attributes matching the name of the
-          modules.
-        '';
-
-        __functor = self: base: modules:
-          let
-            add = state: module: prim-lib.setAttrDeep module.name state module.module;
-          in
-          builtins.foldl' add base modules
-        ;
       };
 
       type-meta-tpl = nixpkgs.writeTextFile {
@@ -365,7 +352,8 @@
                 ;
               };
             modules = map load-module package-meta.modules;
-            add-module = s: m: s // { "${m.uid}" = m.module; };
+            add-module = s: m:
+              prim-lib.setAttrDeep (builtins.trace ("${m.uid}.${m.name}") "${m.uid}.${m.name}") s m.module;
             package-base =
               builtins.foldl'
                 add-module
