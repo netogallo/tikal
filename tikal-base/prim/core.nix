@@ -42,6 +42,136 @@
         '';
       };
 
+      merge-tikal-contexts = {
+        __description = ''
+          Merge many Tikal contexts into a single one. This will result in
+          the context having the exports from all of the input contexts
+        '';
+
+        __functor = self: contexts:
+          let
+            exports = builtins.concatMap (x: x.exports) contexts;
+          in
+          tikal-base // { inherit exports; }
+        ;
+      };
+
+      tikal-base =
+        let
+          meta-tpl = nixpkgs.writeTextFile {
+            name = "tikal.json.tpl";
+            text = ''
+              {
+                "uid": "$uid",
+                "name": "tikal",
+                "version": "1.0.0"
+              }
+            '';
+            destination = "/tikal.json";
+          };
+          drv = stdenv.mkDerivation rec {
+            name = "tikal";
+            src = meta-tpl;
+            nativeBuildInputs = with nixpkgs; [ envsubst hash-package ];
+            dontUnpack = true;
+            dontBuild = true;
+            installPhase = ''
+              mkdir -p $out
+              uid=$(hash-package $src)
+              uid=$uid envsubst -i ${src}/tikal.json > $out/tikal.json
+            '';
+          };
+          meta = builtins.fromJSON (builtins.readFile "${drv}/tikal.json");
+        in
+        {
+          inherit (meta) uid;
+          inherit meta;
+          exports = [];
+        }
+      ;
+
+      tikal-value = rec {
+
+        __description = ''
+        Constructs a Tikal value simply by inserting the most basic
+        context possible. This function is not meant to be part of the
+        public API. It is used internally to construct hand-rolled values.
+        '';
+
+        __functor = _: base-values:
+          let
+            add-members = value:
+              let
+                members = {
+                  merge = merge-member value;
+                  set-exports = set-exports-member value;
+                };
+              in
+                value // members
+            ;
+                
+            merge-member = self: others:
+              let
+                contexts = map (x: x."${tikal-base.uid}") ([self] ++ others);
+                context = merge-tikal-contexts contexts;
+                new-value =
+                  add-exports (
+                    builtins.foldl'
+                      (s: v: v // s)
+                      { "${tikal-base.uid}" = context; }
+                      others
+                  ); 
+                in
+                  add-members new-value;
+            set-exports-member = self: exports:
+              let
+                new-value =
+                  add-exports (
+                    prim-lib.setAttrDeep
+                      [ tikal-base.uid "exports" ]
+                      self
+                      exports
+                  )
+                ;
+              in
+                add-members new-value
+            ;
+            me = {
+              "${tikal-base.uid}" = tikal-base;
+            } // base-values;
+          in
+          add-members me
+        ;
+      };
+
+      add-exports = {
+        __description = ''
+          Given a value with a Tikal context, it constructs a new value which
+          is exactly like the input but also contains additional attributes
+          which are derived from the Tikal context of the value.
+        '';
+
+        __functor = self: value:
+          let
+            error = ''
+              Cannot add exports to a value which is not a value
+              with Tiakl context.
+            '';
+            exports = value."${tikal-base.uid}".exports;
+            extend-attributes = state: { uid, path }:
+              let
+                member = value."${uid}";
+                item = prim-lib.getAttrDeep path member;
+              in
+              prim-lib.setAttrDeep path state item
+            ;
+          in
+          if builtins.hasAttr tikal-base.uid value
+          then builtins.foldl' extend-attributes value exports
+          else throw error
+        ;
+      };
+
       to-tikal-file-meta = nixpkgs.writeShellApplication {
         name = "to-tikal-file-meta";
         runtimeInputs = [ hash-file ];
@@ -197,6 +327,10 @@
               inherit name module package;
             };
             meta = builtins.fromJSON (builtins.readFile "${drv}/tikal.json");
+            make-method = name: spec: self: {
+
+              __functor = _: {};
+            };
           in
           {
             "${meta.uid}" = drv; 
@@ -231,12 +365,17 @@
                 ;
               };
             modules = map load-module package-meta.modules;
-            package-base = {
-              __derivation = package-drv;
-              __modules = modules;
-            };
+            add-module = s: m: s // { "${m.uid}" = m.module; };
+            package-base =
+              builtins.foldl'
+                add-module
+                { "${package-meta.uid}" = package-drv; }
+                modules
+            ;
+            exports =
+              builtins.map (x: { uid = x.uid; path = x.name; }) modules;
           in
-          add-modules package-base modules
+          (tikal-value package-base).set-exports exports
         ;
       };
 
@@ -282,9 +421,8 @@
         __functor = self: tikal: nahual-drv:
           let
             packages = map (package-from-derivation tikal) nahual-drv.dependencies;
-            modules = builtins.concatMap (x: x.__modules) packages;
           in
-          add-modules { inherit modules packages; } modules
+            (builtins.head packages).merge (builtins.tail packages)
         ;
       };
 
