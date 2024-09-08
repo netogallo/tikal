@@ -7,16 +7,36 @@
   __functor = self: args@{ nixpkgs, ... }:
     let
       inherit (nixpkgs) stdenv;
-      tikal-package-file = "tikal-package.nix";
       prim-lib = import ./lib.nix args;
+
+      tikal-meta-file = "tikal.meta.json";
+
+      tikal-package-file = "tikal.json";
+
+      to-tikal-meta = {
+
+        __description = ''
+          Given a derivation representing a Tikal entity, it will return an
+          attribute set with the metadata of said entity. A derivation having
+          a Tikal entity must contain a file named "${tikal-meta-file}" with at least
+          a unique identifier 'uid'.
+        '';
+
+        __functor = self: drv':
+          let
+            drv = builtins.trace "reading: ${drv'}" drv';
+            meta = builtins.fromJSON (builtins.readFile "${drv}/${tikal-meta-file}");
+          in
+          meta // { __derivation = drv; }
+        ;
+      };
+
       tikal-package-template = nixpkgs.writeTextFile {
-        name = "${tikal-package-file}.tpl";
+        name = "${tikal-meta-file}.tpl";
         text = ''
         {
-          uid = "$uid";
-          modules = [
-        $modules
-          ];
+          "uid": "$uid",
+          "modules": $modules
         }
         '';
       };
@@ -59,7 +79,7 @@
       tikal-base =
         let
           meta-tpl = nixpkgs.writeTextFile {
-            name = "tikal.json.tpl";
+            name = "${tikal-meta-file}.tpl";
             text = ''
               {
                 "uid": "$uid",
@@ -67,7 +87,7 @@
                 "version": "1.0.0"
               }
             '';
-            destination = "/tikal.json";
+            destination = "/${tikal-meta-file}.tpl";
           };
           drv = stdenv.mkDerivation rec {
             name = "tikal";
@@ -79,10 +99,10 @@
               mkdir -p $out
               uid=$(hash-package $src)
               uid="$uid-tikal-base"
-              uid=$uid envsubst -i ${src}/tikal.json > $out/tikal.json
+              uid=$uid envsubst -i ${src}/${tikal-meta-file}.tpl -o $out/${tikal-meta-file}
             '';
           };
-          meta = builtins.fromJSON (builtins.readFile "${drv}/tikal.json");
+          meta = to-tikal-meta drv;
         in
         {
           inherit (meta) uid;
@@ -133,7 +153,6 @@
                     self
                     exports
                 ;
- 
                 new-value = add-exports new-self;
               in
                 add-members new-value
@@ -174,13 +193,20 @@
         ;
       };
 
+      tikal-file-meta-tpl = nixpkgs.writeTextFile {
+        name = "tikal-file-meta.tpl";
+        text = ''
+          { "uid": "$uid", "path": "$path" }
+        '';
+      };
+
       to-tikal-file-meta = nixpkgs.writeShellApplication {
         name = "to-tikal-file-meta";
-        runtimeInputs = [ hash-file ];
+        runtimeInputs = [ nixpkgs.envsubst hash-file ];
         text = ''
           uid=$(hash-file "$1")
           name=$(basename "$1" | sed 's/\./-/g')
-          echo "    { uid = \"$uid-$name\"; path = \"$1\"; }"
+          uid="$uid-$name" path=$1 envsubst -i ${tikal-file-meta-tpl}
         '';
       };
 
@@ -189,7 +215,8 @@
         runtimeInputs = [ to-tikal-file-meta ];
         text = ''
           find "$1" -type f -name '*.nix' -print0 \
-          | xargs --null -I{} to-tikal-file-meta {}
+          | xargs --null -I{} to-tikal-file-meta {} \
+          | paste -sd ','
         '';
       };
 
@@ -206,7 +233,7 @@
 
         __functor = self: { root, ... }:
           let
-            meta = builtins.fromJSON (builtins.readFile "${root}/tikal.json");
+            meta = builtins.fromJSON (builtins.readFile "${root}/${tikal-package-file}");
             dependencies = builtins.map package-derivation meta.dependencies;
           in
           stdenv.mkDerivation {
@@ -227,11 +254,12 @@
 
               uid=$(hash-package .)
               modules=$(tikal-modules .)
+              modules="[$modules]"
 
               # todo: generate Haskell files for hoogle indexing.
               uid=$uid \
               modules=$modules \
-              envsubst -i ${tikal-package-template} > ./${tikal-package-file}
+              envsubst -i ${tikal-package-template} > ./${tikal-meta-file}
             '';
 
             installPhase = ''
@@ -256,15 +284,6 @@
 
       };
 
-      type-meta-tpl = nixpkgs.writeTextFile {
-        name = "tikal.json.tpl";
-        text = ''
-          {
-            "uid": "$uid"
-          }
-        '';
-      };
-
       type-builder = rec {
 
         __description = ''
@@ -273,6 +292,16 @@
           is usually supplied automatically when loading the module as Tiakl always
           knows to which package a module belongs to.
         '';
+
+
+        type-meta-tpl = nixpkgs.writeTextFile {
+          name = "${tikal-meta-file}.tpl";
+          text = ''
+            {
+              "uid": "$uid"
+            }
+          '';
+        };
 
         type-derivation = { name, module, package }:
           let
@@ -303,7 +332,7 @@
               mkdir -p $out
               cp ./* $out
               uid=$(hash-package $out)
-              uid=$uid envsubst -i ${type-meta-tpl} > $out/tikal.json
+              uid=$uid envsubst -i ${type-meta-tpl} > $out/${tikal-meta-file}
             '';
           }
         ;
@@ -313,7 +342,7 @@
             drv = type-derivation {
               inherit name module package;
             };
-            meta = builtins.fromJSON (builtins.readFile "${drv}/tikal.json");
+            meta = to-tikal-meta drv;
             make-method = name: spec: self: {
 
               __functor = _: {};
@@ -333,7 +362,7 @@
 
         __functor = self: tikal: package-drv:
           let
-            package-meta = import "${package-drv}/${tikal-package-file}";
+            package-meta = to-tikal-meta package-drv;
             load-module = { uid, path }:
               let
                 module-name = module-name-from-path { inherit path; };
@@ -353,11 +382,11 @@
               };
             modules = map load-module package-meta.modules;
             add-module = s: m:
-              prim-lib.setAttrDeep (builtins.trace ("${m.uid}.${m.name}") "${m.uid}.${m.name}") s m.module;
+              prim-lib.setAttrDeep "${m.uid}.${m.name}" s m.module;
             package-base =
               builtins.foldl'
                 add-module
-                { "${package-meta.uid}" = package-drv; }
+                { "${package-meta.uid}" = package-meta; }
                 modules
             ;
             exports =
