@@ -1,7 +1,31 @@
 {
   __description = ''
-  This file contains all the infrastructure to support Tikal's type and module
-  system.
+    This file contains the implementation of Tikal's module, type and value system.
+    The fundamental principle behind Tikal is to introduce a new family of derivations
+    called "Tikal Derivations". These derivations are meant to represent families of
+    runtime values. So in essence, they can be regarded as types.
+
+    In tikal, all values are attribute sets composed of two kinds of attributes:
+    - Tikal contextual attributes
+    - Exports
+
+    The Tikal contextal attributes contain all the asociations that exist between
+    Tikal derivations and runtime values. Every Tikal derivation has a unique id
+    derived in a similar fashion as how nix itself derives the store path of a derivation.
+    The store path itself is not used bc this introduces cyclical dependencies. This id
+    is used as the attribute name for all Tikal contextual attributes. The value of said
+    attribute will be the runtime value associated to a derivation for that particular
+    value.
+
+    The exports are attributes that make it easy to work with Tikal values. It would
+    be cumbersome accessing the contextual values using the uids directly. Exports
+    simply expose attributes from the contextual values directly in the value.
+
+    There is a special derivation called "tikal-base" which all Tikal objects have
+    as attribute. The runtime context of this derivation contains an attribute called
+    "exports". This attribute is a list of all the derivation UID's and paths in the
+    contextual value that will become attributes of the Tikal value. The function
+    "add-exports" is used to add these attributes to a value.
   '';
 
   __functor = self: args@{ nixpkgs, ... }:
@@ -75,19 +99,30 @@
           all the primitive values from all contexts.
         '';
 
-        __functor = self: contexts:
+        __functor = self: base: contexts:
           let
-            exports = builtins.concatMap (x: x.exports) contexts;
+            get-exports = value:
+              if builtins.hasAttr "exports" value
+              then value.exports
+              else []
+            ;
+            exports = builtins.concatMap (value: value.exports) ([base] ++ contexts);
           in
-          tikal-base // { inherit exports; }
+          base // { inherit exports; }
         ;
       };
 
       tikal-derivation = {
       
         __description = ''
-        Helper function to construct derivations meant to represent Tikal
-        entities.
+        This function constructs a Tikal derivation. Tikal derivations represent
+        families of values at runtime. Each derivation is meant to represent a
+        different families of values.
+
+        All tikal derivations contain a "tikal.meta.json" file as an output. This
+        file contains the metadata of the derivation. The most essential metadata
+        value is the "uid" or unique identifier of the derivation. This value is
+        used to associate the derivation with a runtime value in a Tikal value.
         '';
 
         __functor =
@@ -183,54 +218,105 @@
       tikal-value = rec {
 
         __description = ''
-        Constructs a Tikal value simply by inserting the most basic
-        context possible. This function is not meant to be part of the
-        public API. It is used internally to construct hand-rolled values.
+        Adds the tikal-base context to the given attribute set and also adds
+        the exports offered by tikal-base values.
+
+        This function is meant to be used interally to manually construct Tikal
+        values without relying on Tikal's type system.
         '';
 
         __functor = _: base-values:
           let
-            add-members = value:
+            base-exports = [
+              { uid = tikal-base.uid; path = "members.merge"; target = "merge"; }
+              { uid = tikal-base.uid; path = "members.set-exports"; target = "set-exports"; }
+            ];
+            base-members = value:
               let
-                members = {
-                  merge = merge-member value;
-                  set-exports = set-exports-member value;
-                };
+                members =
+                  prim-lib.self-overridable
+                    {
+                      merge = merge-member;
+                      set-exports = set-exports-member;
+                    }
+                    value
+                ;
+                exports = base-exports;
               in
-                value // members
+                { inherit exports members; }
             ;
-                
+    
             merge-member = self: others:
               let
-                items-to-merge = [self] ++ others;
-                contexts = map (x: x."${tikal-base.uid}") items-to-merge;
-                context = merge-tikal-contexts contexts;
-                new-value =
-                  add-exports (
-                    builtins.foldl'
-                      (s: v: v // s)
-                      { "${tikal-base.uid}" = context; }
-                      items-to-merge
-                  ); 
-                in
-                  add-members new-value;
-            set-exports-member = self: exports:
-              let
-                new-self =
-                  prim-lib.setAttrDeep
-                    [ tikal-base.uid "exports" ]
-                    self
-                    exports
-                ;
-                new-value = add-exports new-self;
+                self-ctx = self."${tikal-base.uid}";
+                contexts = map (x: x."${tikal-base.uid}") others;
+                context = merge-tikal-contexts self-ctx contexts;
               in
-                add-members new-value
+                add-exports (
+                  builtins.foldl'
+                    (s: v: v // s)
+                    { "${tikal-base.uid}" = context; }
+                    ([self] ++ others)
+                )
             ;
-            me = {
-              "${tikal-base.uid}" = tikal-base;
-            } // base-values;
+
+            set-exports-member = self: new-exports:
+              let
+                exports = base-exports ++ new-exports;
+                add-export-attribute = s: { uid, ... }:
+                  let
+                    ctx = self."${uid}";
+                    members =
+                      if builtins.hasAttr "members" ctx
+                      then ctx.members.__override new-self
+                      else {}
+                    ;
+                    new-ctx = ctx // { inherit members; };
+                  in
+                  s // { "${uid}" = new-ctx; }
+                ;
+                new-self-base =
+                  builtins.foldl'
+                    add-export-attribute
+                    {}
+                    exports;
+                new-self =
+                  add-exports (
+                    prim-lib.setAttrDeep
+                      [ tikal-base.uid "exports" ]
+                      new-self-base
+                      exports
+                  )
+                ;
+              in
+                new-self
+            ;
+
+            with-exports-member = self: name: decls:
+              let
+                meta-template = nixpkgs.writeTextFile {
+                  name = "${name}.meta.tpl";
+                  text = ''
+                    {
+                      "uid": "$uid",
+                      "name": "$name"
+                    }
+                  '';
+                };
+                drv = tikal-derivation {
+                  inherit name;
+                  src = ./core/tikal-exports;
+                  tikalMetaTemplate = meta-template;
+                };
+                meta = to-tikal-meta drv;
+              in
+                throw "err"
+            ;
+            me = base-values // {
+              "${tikal-base.uid}" = tikal-base // base-members me;
+            };
           in
-          add-members me
+          add-exports me
         ;
       };
 
@@ -248,12 +334,13 @@
               with Tiakl context.
             '';
             exports = value."${tikal-base.uid}".exports;
-            extend-attributes = state: { uid, path }:
+            extend-attributes = state: { uid, path, target ? null }:
               let
                 member = value."${uid}";
                 item = prim-lib.getAttrDeepPoly { strict = true; } path member;
+                target-path = if target == null then path else target;
               in
-              prim-lib.setAttrDeep path state item
+              prim-lib.setAttrDeep target-path state item
             ;
           in
           if builtins.hasAttr tikal-base.uid value
@@ -445,7 +532,10 @@
               };
             modules = map load-module package-meta.modules;
             add-module = s: m:
-              prim-lib.setAttrDeep "${m.uid}.${m.name}" s m.module;
+              let
+                name = builtins.trace "Add module: ${m.name}" m.name;
+              in
+              prim-lib.setAttrDeep "${m.uid}.${name}" s m.module;
             package-base =
               builtins.foldl'
                 add-module
@@ -453,7 +543,7 @@
                 modules
             ;
             exports =
-              builtins.map (x: { uid = x.uid; path = x.name; }) modules;
+              builtins.map (x: { uid = x.uid; path = builtins.trace "Add export: ${x.name}" x.name; }) modules;
           in
           (tikal-value package-base).set-exports exports
         ;
@@ -516,7 +606,10 @@
           let
             packages = map (load-package-modules tikal) tikal-main-package.dependencies;
           in
-            (builtins.head packages).merge (builtins.tail packages)
+            {
+              tikal-main = (builtins.head packages).merge (builtins.tail packages);
+              inherit packages;
+            }
         ;
       };
 

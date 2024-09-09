@@ -208,6 +208,20 @@ let
     
     # end project
   };
+
+
+  self-overridable = {
+
+    __description = ''
+      Given a attribute set with function fields and a value. Create a new
+      attribute set by applying the functions to the value and additinoally,
+      provide an attribute with a function to further override the result.
+    '';
+
+    __functor = self: attr: value:
+      builtins.mapAttrs (name: fn: fn value) attr // { __override = new-self: self attr new-self; }
+    ;
+  };
 in
 {
   inherit
@@ -216,6 +230,6 @@ in
     findPaths
     getAttrDeep getAttrDeepPoly
     project
-    setAttrDeep
+    self-overridable setAttrDeep
     tests;
 }
