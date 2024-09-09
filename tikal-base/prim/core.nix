@@ -54,7 +54,7 @@
         runtimeInputs = [ hash-file ];
         text = ''
           hashes=$(\
-            find "$1" -print0 -type f -name '*.nix' \
+            find "$1" -print0 -type f \
             | xargs --null -I{} hash-file {} \
           )
 
@@ -65,7 +65,14 @@
       merge-tikal-contexts = {
         __description = ''
           Merge many Tikal contexts into a single one. This will result in
-          the context having the exports from all of the input contexts
+          the context having the exports from all of the input contexts. The
+          Tikal context of a value is a value stored under the
+          "${tikal-base.uid}" attribute. This value contains:
+          - The unique identifier of the current value
+          - The primitive nix value used to construct the value
+          - The exports of said value
+          Note that this function is meant for internal use as it discards
+          all the primitive values from all contexts.
         '';
 
         __functor = self: contexts:
@@ -76,6 +83,77 @@
         ;
       };
 
+      tikal-derivation = {
+      
+        __description = ''
+        Helper function to construct derivations meant to represent Tikal
+        entities.
+        '';
+
+        __functor =
+          self:
+          { 
+            name,
+            src,
+            tikalMetaTemplate,
+            nativeBuildInputs ? [],
+            tikalDependencies ? [],
+            dontUnpack ? true,
+            dontBuild ? true,
+            buildPhase ? "",
+            installPhase ? "",
+          }:
+          let
+            deps-hashes =
+              builtins.concatStringsSep
+                "\n"
+                (
+                  builtins.map
+                  (x: "echo ${x.uid} >> $hashfile")
+                  tikalDependencies
+                )
+            ;
+          in
+          stdenv.mkDerivation {
+            inherit name src dontBuild dontUnpack;
+            nativeBuildInputs = with nixpkgs; [
+              envsubst
+              hash-file
+              hash-package
+            ] ++ nativeBuildInputs;
+            tikalDependencies = map (x: x.__derivation) tikalDependencies;
+            buildPhase = ''
+              envfile="$PWD/envfile"
+              ${buildPhase}
+            '';
+            installPhase = ''
+              mkdir -p $out
+              hashfile="$out/hashfile"
+              envfile="$out/envfile"
+              touch $envfile
+              touch $hashfile
+
+              if [ -f $src/envfile ]; then
+                cat $src/envfile >> $envfile
+              fi
+
+              if [ -f $PWD/envfile ]; then
+                cat $PWD/envfile >> $envfile
+              fi
+
+              ${deps-hashes}
+              ${installPhase}
+              src_hash=$(hash-package $src)
+              echo $src_hash >> $hashfile
+              master_hash=$(hash-file $hashfile)
+              echo "export uid=\"$master_hash-${name}\"" >> $envfile
+              echo "export name=${name}" >> $envfile
+              (source $envfile && envsubst -i ${tikalMetaTemplate} > $out/${tikal-meta-file})
+            '';
+          }
+        ;
+      };
+
       tikal-base =
         let
           meta-tpl = nixpkgs.writeTextFile {
@@ -83,24 +161,15 @@
             text = ''
               {
                 "uid": "$uid",
-                "name": "tikal",
-                "version": "1.0.0"
+                "name": "$name",
+                "version": "$version"
               }
             '';
-            destination = "/${tikal-meta-file}.tpl";
           };
-          drv = stdenv.mkDerivation rec {
-            name = "tikal";
-            src = meta-tpl;
-            nativeBuildInputs = with nixpkgs; [ envsubst hash-package ];
-            dontUnpack = true;
-            dontBuild = true;
-            installPhase = ''
-              mkdir -p $out
-              uid=$(hash-package $src)
-              uid="$uid-tikal-base"
-              uid=$uid envsubst -i ${src}/${tikal-meta-file}.tpl -o $out/${tikal-meta-file}
-            '';
+          drv = tikal-derivation rec {
+            name = "tikal-prim";
+            src = ./core/tikal-base;
+            tikalMetaTemplate = meta-tpl;
           };
           meta = to-tikal-meta drv;
         in
@@ -220,53 +289,47 @@
         '';
       };
 
-      package-derivation = {
+      tikal-package = {
 
         __description = ''
-          Creates a derivation for a module. The base derivation will contain
-          a directory with all of the types within the module. In addition to
-          all this, it will contain a few files with metadata including:
-            - A file with a unique identifier for the module computed
-              by hashing all of its files.
-            - A file listing all types in the module.
+          Creates a value that represents a Tikal package. This function takes
+          as input a directory containing a "tikal.json" file which describes
+          the package. The result is an attribute set which contains the metadata
+          of said package as well as the derivation created to represent the package.
         '';
 
         __functor = self: { root, ... }:
           let
             meta = builtins.fromJSON (builtins.readFile "${root}/${tikal-package-file}");
-            dependencies = builtins.map package-derivation meta.dependencies;
+            dependencies = builtins.map tikal-package meta.dependencies;
+            tikalDependencies = builtins.map (d: d.__derivation) meta.dependencies;
+            drv = tikal-derivation {
+              inherit tikalDependencies;
+              name = meta.name;
+              src = root;
+              dontBuild = null;
+
+              tikalMetaTemplate = tikal-package-template;
+
+              nativeBuildInputs = with nixpkgs; [
+                envsubst
+                tikal-modules
+              ];
+
+              buildPhase = ''
+                cp -r $src/* .
+
+                uid=$(hash-package .)
+                modules=$(tikal-modules .)
+                echo "export modules='[$modules]'" > $envfile
+              '';
+
+              installPhase = ''
+                cp -r ./* $out
+              '';
+            };
           in
-          stdenv.mkDerivation {
-            inherit dependencies;
-            name = meta.name;
-            src = root;
-            dontUnpack = true;
-
-            nativeBuildInputs = with nixpkgs; [
-              envsubst
-              hash-file
-              hash-package
-              tikal-modules
-            ];
-
-            buildPhase = ''
-              cp -r $src/* .
-
-              uid=$(hash-package .)
-              modules=$(tikal-modules .)
-              modules="[$modules]"
-
-              # todo: generate Haskell files for hoogle indexing.
-              uid=$uid \
-              modules=$modules \
-              envsubst -i ${tikal-package-template} > ./${tikal-meta-file}
-            '';
-
-            installPhase = ''
-              mkdir -p $out
-              cp -r ./* $out
-            '';
-          }
+            to-tikal-meta drv // { inherit dependencies; }
         ;
       };
 
@@ -343,26 +406,26 @@
               inherit name module package;
             };
             meta = to-tikal-meta drv;
-            make-method = name: spec: self: {
+            new-method = name: spec: self: {
 
               __functor = _: {};
             };
           in
-          {
-            "${meta.uid}" = drv; 
+          tikal-value {
+            "${meta.uid}" = meta;
           }
         ;
       };
 
-      package-from-derivation = {
+      load-package-modules = {
 
         __description = ''
           Load a package from a derivationo which represents said package.
         '';
 
-        __functor = self: tikal: package-drv:
+        __functor = self: tikal: package-meta:
           let
-            package-meta = to-tikal-meta package-drv;
+            package-drv = package-meta.__derivation;
             load-module = { uid, path }:
               let
                 module-name = module-name-from-path { inherit path; };
@@ -396,66 +459,80 @@
         ;
       };
 
-      tikal-base-package-derivation = package-derivation rec {
+      tikal-base-package = tikal-package {
         root = ../.;
       };
 
-      nahual-base-derivation = stdenv.mkDerivation {
-        name = "nahual";
-        src = ./.;
-        dontUnpack = true;
-        dontBuild = true;
-        installPhase = ''
-          touch $out
-        '';
-        dependencies = [
-          tikal-base-package-derivation
-        ];
-      };
+      tikal-main-with = { tikalDependencies ? [] }:
+        let
+          tikal-main-tpl = nixpkgs.writeTextFile {
+            name = "${tikal-meta-file}.tpl";
+            text = ''
+              {
+                "uid": "$uid",
+                "version": "$version"
+              }
+            '';
+          };
+          dependencies = [ tikal-base-package ] ++ tikalDependencies;
+          drv = tikal-derivation {
+            name = "tikal-main";
+            tikalMetaTemplate = tikal-main-tpl;
+            src = ./core/tikal-main;
+            installPhase = ''
+              touch $out
+            '';
+            tikalDependencies = dependencies;
+          };
+        in
+        to-tikal-meta drv // { inherit dependencies; }
+      ;
 
-      extend-nahual-derivation = {
+      tikal-main-package = tikal-main-with {};
+
+      extend-tikal-main = {
 
         __description = ''
           Add additional packages to the given Nahual.
         '';
 
-        __functor = self: nahual-drv: { packages }:
+        __functor = _: self-tikal-main: { packages }:
           let
-            packages-drv = map package-derivation packages;
+            packages = map tikal-package packages;
           in
-          nahual-drv.override {
-            dependencies = nahual-drv.dependencies ++ packages-drv;
+          tikal-main-with {
+            tikalDependencies = packages;
           }
         ;
       };
 
-      load-nahual-modules = {
+      load-modules = {
 
         __description = ''
           Load all modules from a Nahual derivation.
         '';
 
-        __functor = self: tikal: nahual-drv:
+        __functor = self: tikal: tikal-main-package:
           let
-            packages = map (package-from-derivation tikal) nahual-drv.dependencies;
+            packages = map (load-package-modules tikal) tikal-main-package.dependencies;
           in
             (builtins.head packages).merge (builtins.tail packages)
         ;
       };
 
-      nahual = drv:
+      init-tikal-main = main-package:
         let
-          new-nahual = load-nahual-modules new-nahual drv // {
+          tikal-main = load-modules tikal-main main-package // {
             inherit nixpkgs;
-            __derivation = drv;
-            load = load-args: nahual (extend-nahual-derivation drv load-args);
-            load-module = nixpkgs.newScope new-nahual;
+            __derivation = main-package.__derivation;
+            load = load-args: init-tikal-main (extend-tikal-main main-package load-args);
+            load-module = nixpkgs.newScope tikal-main;
           };
         in
-        new-nahual
+        tikal-main
       ;
 
     in
-    { result = nahual nahual-base-derivation; }
+    { tikal = init-tikal-main tikal-main-package; }
   ;
 }
