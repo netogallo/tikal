@@ -55,6 +55,26 @@
         '';
       }
     ;
+    
+    type-instance-methods =
+      {
+        type-decl,
+        instance-meta
+      }: {
+      new = self: _: prim:
+        let
+          result = type-decl prim;
+          error = prim-lib.getAttrDeep "error" prim;
+          instance-ext = instance-meta // {
+            prim = result;
+          };
+        in
+          if error != null
+          then throw error
+          else value.extend [instance-ext]
+      ;
+    };
+      
 
     new-type-member =
       self: _: { module, package, ...}: { name, ... }@type-decl:
@@ -62,10 +82,18 @@
           drv = type-derivation {
             inherit name module package;
           };
-          meta = to-tikal-meta drv;
-          new-method = name: spec: self: {
-
-            __functor = _: {};
+          instance-meta = prim-utils.mk-tikal-value "${name}-instance";
+          members = prim-lib.self-overridable (
+            type-instance-methods {
+              type-decl = type-decl;
+              instance-meta = instance-meta;
+            }
+          ) null;
+          meta = to-tikal-meta drv // {
+            inherit instance-meta members;
+            exports = [
+              { uid = meta.uid; path = "members.new"; target = "__functor"; }
+            ];
           };
         in
           value.extend [meta]

@@ -25,7 +25,7 @@ let
         path-str = concatStringsSep "." path;
         empty = if strict then throw "Attribute '${path-str}' not in object." else null;
         cata = s: a:
-          if s == null || !(hasAttr a s)
+          if s == null || builtins.typeOf s != "set" || !(hasAttr a s)
 	        then empty
 	        else getAttr a s;
       in

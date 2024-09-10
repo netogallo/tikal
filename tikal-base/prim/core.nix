@@ -236,7 +236,8 @@
         '';
 
         __functor = self: value:
-          prim-lib.getAttrDeep "tikal-base-uid" value == tikal-base.uid
+          builtins.typeOf value == "set"
+          && prim-lib.getAttrDeep "tikal-base-uid" value == tikal-base.uid
         ;
       };
 
@@ -254,6 +255,7 @@
           let
             base-exports = [
               { uid = tikal-base.uid; path = "members.extend"; target = "extend"; }
+              { uid = tikal-base.uid; path = "members.extend-any"; target = "extend-any"; }
             ];
             base-members = value:
               let
@@ -261,6 +263,7 @@
                   prim-lib.self-overridable
                     {
                       extend = extend-member;
+                      extend-any = extend-any-member;
                     }
                     value
                 ;
@@ -269,7 +272,9 @@
                 { inherit exports members; }
             ;
 
-            extend-member = self: extensions-in:
+            extend-member = self: extensions: self.extend-any { inherit extensions; };
+
+            extend-any-member = self: { extensions }:
               let
                 check-extension = ext:
                   if is-extension ext
@@ -294,19 +299,22 @@
                 existing-extensions =
                   builtins.concatMap cat-extensions (builtins.attrValues self);
                 make-extension = ext: scope-extension (check-extension ext);
-                extensions = existing-extensions ++ map make-extension extensions-in;
+                all-extensions = existing-extensions ++ map make-extension extensions;
                 add-extension = s: ext: s // { "${ext.uid}" = ext; };
-                new-value = builtins.foldl' add-extension {} extensions;
+                new-value = builtins.foldl' add-extension {} all-extensions;
                 result = add-exports new-value;
               in
                 result
             ;
 
-            me = base-values // {
-              "${tikal-base.uid}" = tikal-base // base-members me;
-            };
+            result =
+              add-exports (
+                base-values // {
+                  "${tikal-base.uid}" = tikal-base // base-members result;
+                }
+              );
           in
-          add-exports me
+          result
         ;
       };
 
