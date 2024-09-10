@@ -51,7 +51,11 @@
             drv = builtins.trace "reading: ${drv'}" drv';
             meta = builtins.fromJSON (builtins.readFile "${drv}/${tikal-meta-file}");
           in
-          meta // { __derivation = drv; }
+          meta // {
+            exports = [];
+            tikal-base-uid = tikal-base.uid;
+            __derivation = drv;
+          }
         ;
       };
 
@@ -211,11 +215,26 @@
         {
           inherit (meta) uid;
           inherit meta;
+          tikal-base-uid = meta.uid;
           exports = [];
         }
       ;
 
-      tikal-value = rec {
+      is-extension = {
+
+        __description = ''
+          Check if a value is a Tikal object extension. An object extension is
+          a value that allows adding new members to an existing Tikal object.
+          Thikal extensions are tagged with the 'tikal-base-uid' attribute which
+          contains the uid of the Tikal version of that extension.
+        '';
+
+        __functor = self: value:
+          prim-lib.getAttrDeep "tikal-base-uid" value == tikal-base.uid
+        ;
+      };
+
+      new-tikal-value = rec {
 
         __description = ''
         Adds the tikal-base context to the given attribute set and also adds
@@ -228,16 +247,14 @@
         __functor = _: base-values:
           let
             base-exports = [
-              { uid = tikal-base.uid; path = "members.merge"; target = "merge"; }
-              { uid = tikal-base.uid; path = "members.set-exports"; target = "set-exports"; }
+              { uid = tikal-base.uid; path = "members.extend"; target = "extend"; }
             ];
             base-members = value:
               let
                 members =
                   prim-lib.self-overridable
                     {
-                      merge = merge-member;
-                      set-exports = set-exports-member;
+                      extend = extend-member;
                     }
                     value
                 ;
@@ -245,73 +262,40 @@
               in
                 { inherit exports members; }
             ;
-    
-            merge-member = self: others:
-              let
-                self-ctx = self."${tikal-base.uid}";
-                contexts = map (x: x."${tikal-base.uid}") others;
-                context = merge-tikal-contexts self-ctx contexts;
-              in
-                add-exports (
-                  builtins.foldl'
-                    (s: v: v // s)
-                    { "${tikal-base.uid}" = context; }
-                    ([self] ++ others)
-                )
-            ;
 
-            set-exports-member = self: new-exports:
+            extend-member = self: extensions-in:
               let
-                exports = base-exports ++ new-exports;
-                add-export-attribute = s: { uid, ... }:
-                  let
-                    ctx = self."${uid}";
-                    members =
-                      if builtins.hasAttr "members" ctx
-                      then ctx.members.__override new-self
-                      else {}
-                    ;
-                    new-ctx = ctx // { inherit members; };
-                  in
-                  s // { "${uid}" = new-ctx; }
-                ;
-                new-self-base =
-                  builtins.foldl'
-                    add-export-attribute
-                    {}
-                    exports;
-                new-self =
-                  add-exports (
-                    prim-lib.setAttrDeep
-                      [ tikal-base.uid "exports" ]
-                      new-self-base
-                      exports
-                  )
-                ;
-              in
-                new-self
-            ;
-
-            with-exports-member = self: name: decls:
-              let
-                meta-template = nixpkgs.writeTextFile {
-                  name = "${name}.meta.tpl";
-                  text = ''
-                    {
-                      "uid": "$uid",
-                      "name": "$name"
-                    }
+                check-extension = ext:
+                  if is-extension ext
+                  then ext
+                  else throw ''
+                    Tikal extensions must have the 'tikal-base-uid' attribute set
+                    to the uid of the Tikal base derivation used for the extension.
                   '';
-                };
-                drv = tikal-derivation {
-                  inherit name;
-                  src = ./core/tikal-exports;
-                  tikalMetaTemplate = meta-template;
-                };
-                meta = to-tikal-meta drv;
+                scope-extension = ext:
+                  let
+                    members = ext.members.__override result;
+                  in
+                  if builtins.hasAttr "members" ext
+                  then ext // { inherit members; }
+                  else ext
+                ;
+                cat-extensions = ext:
+                  if is-extension ext
+                  then [ (scope-extension ext) ]
+                  else []
+                ;
+                existing-extensions =
+                  builtins.concatMap cat-extensions (builtins.attrValues self);
+                make-extension = ext: scope-extension (check-extension ext);
+                extensions = existing-extensions ++ map make-extension extensions-in;
+                add-extension = s: ext: s // { "${ext.uid}" = ext; };
+                new-value = builtins.foldl' add-extension {} extensions;
+                result = add-exports new-value;
               in
-                throw "err"
+                result
             ;
+
             me = base-values // {
               "${tikal-base.uid}" = tikal-base // base-members me;
             };
@@ -319,6 +303,8 @@
           add-exports me
         ;
       };
+
+      tikal-value = new-tikal-value {};
 
       add-exports = {
         __description = ''
@@ -329,23 +315,29 @@
 
         __functor = self: value:
           let
-            error = ''
-              Cannot add exports to a value which is not a value
-              with Tiakl context.
-            '';
-            exports = value."${tikal-base.uid}".exports;
-            extend-attributes = state: { uid, path, target ? null }:
+            attributes = builtins.attrNames value;
+            cat-extensions = attr:
               let
-                member = value."${uid}";
-                item = prim-lib.getAttrDeepPoly { strict = true; } path member;
-                target-path = if target == null then path else target;
+                ext = value."${attr}";
               in
-              prim-lib.setAttrDeep target-path state item
+                if is-extension ext
+                then [ext]
+                else []
+            ;
+            extensions = builtins.concatMap cat-extensions attributes;
+            add-export = s: { uid, path, target ? null }:
+              let
+                ctx = value."${uid}";
+                member = prim-lib.getAttrDeepPoly { strict = true; } path ctx;
+                out-path = if target == null then path else target;
+              in
+                prim-lib.setAttrDeep out-path s member
+              ;
+            add-exports = s: ext:
+              builtins.foldl' add-export s ext.exports
             ;
           in
-          if builtins.hasAttr tikal-base.uid value
-          then builtins.foldl' extend-attributes value exports
-          else throw error
+            builtins.foldl' add-exports value extensions
         ;
       };
 
@@ -443,7 +435,6 @@
           knows to which package a module belongs to.
         '';
 
-
         type-meta-tpl = nixpkgs.writeTextFile {
           name = "${tikal-meta-file}.tpl";
           text = ''
@@ -498,9 +489,7 @@
               __functor = _: {};
             };
           in
-          tikal-value {
-            "${meta.uid}" = meta;
-          }
+          tikal-value.extend [meta]
         ;
       };
 
@@ -536,16 +525,18 @@
                 name = builtins.trace "Add module: ${m.name}" m.name;
               in
               prim-lib.setAttrDeep "${m.uid}.${name}" s m.module;
-            package-base =
-              builtins.foldl'
-                add-module
-                { "${package-meta.uid}" = package-meta; }
-                modules
-            ;
-            exports =
-              builtins.map (x: { uid = x.uid; path = builtins.trace "Add export: ${x.name}" x.name; }) modules;
+            mk-export = module:
+              {
+                uid = "${package-meta.uid}";
+                path = "modules.${module.uid}.${module.name}";
+                target = module.name;
+              };
+            package-extension = package-meta // {
+              exports = builtins.map mk-export modules;
+              modules = builtins.foldl' add-module {} modules;
+            };
           in
-          (tikal-value package-base).set-exports exports
+            package-extension
         ;
       };
 
@@ -606,10 +597,7 @@
           let
             packages = map (load-package-modules tikal) tikal-main-package.dependencies;
           in
-            {
-              tikal-main = (builtins.head packages).merge (builtins.tail packages);
-              inherit packages;
-            }
+            tikal-value.extend packages
         ;
       };
 
@@ -617,7 +605,6 @@
         let
           tikal-main = load-modules tikal-main main-package // {
             inherit nixpkgs;
-            __derivation = main-package.__derivation;
             load = load-args: init-tikal-main (extend-tikal-main main-package load-args);
             load-module = nixpkgs.newScope tikal-main;
           };
