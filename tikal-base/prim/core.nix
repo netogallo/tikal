@@ -46,9 +46,8 @@
           a unique identifier 'uid'.
         '';
 
-        __functor = self: drv':
+        __functor = self: drv:
           let
-            drv = builtins.trace "reading: ${drv'}" drv';
             meta = builtins.fromJSON (builtins.readFile "${drv}/${tikal-meta-file}");
           in
           meta // {
@@ -193,7 +192,9 @@
         ;
       };
 
-      tikal-base =
+      k-tikal-prim = "tikal-prim";
+
+      mk-tikal-value = name:
         let
           meta-tpl = nixpkgs.writeTextFile {
             name = "${tikal-meta-file}.tpl";
@@ -206,7 +207,7 @@
             '';
           };
           drv = tikal-derivation rec {
-            name = "tikal-prim";
+            inherit name;
             src = ./core/tikal-base;
             tikalMetaTemplate = meta-tpl;
           };
@@ -215,10 +216,15 @@
         {
           inherit (meta) uid;
           inherit meta;
-          tikal-base-uid = meta.uid;
+          tikal-base-uid =
+            if name == k-tikal-prim
+            then meta.uid
+            else tikal-base.uid;
           exports = [];
         }
       ;
+
+      tikal-base = mk-tikal-value k-tikal-prim;
 
       is-extension = {
 
@@ -426,72 +432,20 @@
 
       };
 
-      type-builder = rec {
-
-        __description = ''
-          Function used to declare new types. It must be provided with a "package"
-          derivation representing the package where the type will be created. This
-          is usually supplied automatically when loading the module as Tiakl always
-          knows to which package a module belongs to.
-        '';
-
-        type-meta-tpl = nixpkgs.writeTextFile {
-          name = "${tikal-meta-file}.tpl";
-          text = ''
-            {
-              "uid": "$uid"
-            }
-          '';
+      prim-ctx = {
+        inherit nixpkgs prim-lib;
+        value = tikal-value;
+        prim-utils = {
+          inherit
+            hash-package
+            mk-tikal-value
+            tikal-meta-file
+            to-tikal-meta
+          ;
         };
-
-        type-derivation = { name, module, package }:
-          let
-            type-src = nixpkgs.writeTextFile {
-              name = "${name}.hs";
-              text = ''
-                module ${module}.${name} where
-
-                package :: String
-                package = "${package}"
-
-                data ${name} = ${name}
-              '';
-              destination = "/${name}.hs";
-            };
-          in
-          stdenv.mkDerivation {
-            inherit name module package;
-            src = nixpkgs.symlinkJoin {
-              inherit name;
-              paths = [ type-src ];
-            };
-            nativeBuildInputs = with nixpkgs; [ envsubst hash-package ];
-            dontUnpack = true;
-            # todo: type-check the Haskell file.
-            dontBuild = true;
-            installPhase = ''
-              mkdir -p $out
-              cp ./* $out
-              uid=$(hash-package $out)
-              uid=$uid envsubst -i ${type-meta-tpl} > $out/${tikal-meta-file}
-            '';
-          }
-        ;
-
-        __functor = self: { module, package, ...}: { name, ... }@type-decl:
-          let
-            drv = type-derivation {
-              inherit name module package;
-            };
-            meta = to-tikal-meta drv;
-            new-method = name: spec: self: {
-
-              __functor = _: {};
-            };
-          in
-          tikal-value.extend [meta]
-        ;
       };
+
+      Prim = import ../Tikal/Prim.nix prim-ctx;
 
       load-package-modules = {
 
@@ -516,15 +470,12 @@
                 module =
                   tikal.load-module
                     "${package-drv}/${path}"
-                    { type = type-builder module-meta; }
+                    { type = Prim.Type module-meta; }
                 ;
               };
             modules = map load-module package-meta.modules;
             add-module = s: m:
-              let
-                name = builtins.trace "Add module: ${m.name}" m.name;
-              in
-              prim-lib.setAttrDeep "${m.uid}.${name}" s m.module;
+              prim-lib.setAttrDeep "${m.uid}.${m.name}" s m.module;
             mk-export = module:
               {
                 uid = "${package-meta.uid}";
@@ -603,7 +554,7 @@
 
       init-tikal-main = main-package:
         let
-          tikal-main = load-modules tikal-main main-package // {
+          tikal-main = load-modules tikal-main main-package // prim-ctx // {
             inherit nixpkgs;
             load = load-args: init-tikal-main (extend-tikal-main main-package load-args);
             load-module = nixpkgs.newScope tikal-main;

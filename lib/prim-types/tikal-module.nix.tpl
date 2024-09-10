@@ -1,6 +1,0 @@
-{
-  uid = "$uid";
-  paths = [
-$paths[*]
-  ];
-}
