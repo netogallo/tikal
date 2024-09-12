@@ -14,10 +14,10 @@
         This type represents the Nix 'int' type.
       '';
 
-      __functor = { result, ... }: prim:
+      __functor = self: { Result, ... }: prim:
         if builtins.typeOf prim == "int"
-        then result.value prim
-        else result.error "A nix int is needed to construct the Int type"
+        then Result.result prim
+        else Result.error "A nix int is needed to construct the Int type"
       ;
     };
 
@@ -29,10 +29,10 @@
         This type represents the Nix 'string' type.
       '';
 
-      __functor = { result, ... }: prim:
+      __functor = self: { Result, ... }: prim:
         if builtins.typeOf prim == "string"
-        then result.value prim
-        else result.error "A nix string is needed to construct the String type"
+        then Result.result prim
+        else Result.error "A nix string is needed to construct the String type"
       ;
 
       members = { self-type, ... }: {

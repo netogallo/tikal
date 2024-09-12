@@ -34,6 +34,8 @@ let
     __end = "getAttrDeepPoly";
   };
 
+  getAttrDeepStrict = getAttrDeepPoly { strict = true; };
+
   getAttrDeep = getAttrDeepPoly { strict = false; };
 
   setAttrDeep = pathAny: obj: value:
@@ -228,7 +230,7 @@ in
     all
     compose
     findPaths
-    getAttrDeep getAttrDeepPoly
+    getAttrDeep getAttrDeepPoly getAttrDeepStrict
     project
     self-overridable setAttrDeep
     tests;

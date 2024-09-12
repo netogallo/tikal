@@ -226,6 +226,20 @@
 
       tikal-base = mk-tikal-value k-tikal-prim;
 
+      is-tikal-value = {
+
+        __description = ''
+          Check if a value is a Tikal value. A Tikal value is an attribute set
+          that contains a Tikal context under the attribute "${tikal-base.uid}".
+          This context contains the exports of the value.
+        '';
+
+        __functor = self: value:
+          builtins.typeOf value == "set"
+          && builtins.hasAttr tikal-base.uid value
+        ;
+      };
+
       is-extension = {
 
         __description = ''

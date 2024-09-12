@@ -55,23 +55,83 @@
         '';
       }
     ;
+
+    Result =
+      let
+        instance-spec =
+          prim-utils.mk-tikal-value "Result-instance" //
+          {
+            members = instance-members;
+            exports = map (s: s // { uid = instance-spec.uid; }) [
+              { path = "members.result"; target = "result"; }
+              { path = "members.error"; target = "error"; }
+              { path = "members.is-result"; target = "is-result"; }
+              { path = "members.is-error"; target = "is-error"; }
+              { path = "members.match"; target = "match"; }
+            ];
+          };
+        instance-members =
+          prim-lib.self-overridable
+            {
+              result = self: prim-lib.getAttrDeepStrict "${instance-spec.uid}.value" self;
+              error = self: prim-lib.getAttrDeepStrict "${instance-spec.uid}.error" self;
+              is-result = self: !self.is-error;
+              is-error = self: self.error != null;
+              match = self: { result, error }:
+                if self.is-result
+                then result self.result
+                else error self.error
+              ;
+            }
+            null
+        ;
+        spec =
+          prim-utils.mk-tikal-value "Result" //
+          {
+            members = type-members;
+            exports = map (s: s // {uid = spec.uid; }) [
+              { path = "members.result"; target = "result"; }
+              { path = "members.error"; target = "error"; }
+            ];
+          };
+        result-type = value.extend [spec];
+        type-members = prim-lib.self-overridable {
+            result = self: prim-value:
+              let
+                new-instance = instance-spec // { value = prim-value; error = null; };
+              in
+                value.extend [ new-instance ]
+            ;
+            error = self: error:
+              let
+                new-instance = instance-spec // { inherit error; value = null; };
+              in
+                if error == null
+                then throw "Cannot set a result error to null"
+                else value.extend [ new-instance ]
+            ;
+          }
+          null;
+      in
+        result-type
+      ;
     
     type-instance-methods =
       {
         type-decl,
         instance-meta
       }: {
-      new = self: _: prim:
-        let
-          result = type-decl prim;
-          error = prim-lib.getAttrDeep "error" prim;
-          instance-ext = instance-meta // {
-            prim = result;
-          };
-        in
-          if error != null
-          then throw error
-          else value.extend [instance-ext]
+      new = self: _: prim-input:
+        (type-decl { inherit Result; } prim-input).match {
+          result = prim: instance-meta // { inherit prim; };
+          error = throw;
+        }
+      ;
+
+      is-instance-value = self: value:
+        if prim-utils.is-tikal-value value
+        then builtins.hasAttr "${instance-meta.uid}" value
+        else (type-decl value).is_result
       ;
     };
       
