@@ -115,26 +115,108 @@
       in
         result-type
       ;
+
+    mk-member = {
+    
+      __description = ''
+        Given a spec for a type member function or value, this function will
+        create both a member function and the exports object to allow adding
+        said member function to the type.
+      '';
+
+      __functor = self: { instance-meta, ... }: { name, spec }:
+        let
+          inherit (spec) type;
+          member-fn-builder = { i, fn }:
+            (type.get-input-arg i).match {
+              result = arg: value: member-fn-builder { i = i + 1; fn = fn (arg value); };
+              error = _: out-type fn;
+            }
+          ;
+          member-fn = self: member-fn-builder { i = 0; fn = spec { inherit self; }; };
+          out-type = type.out-type;
+        in
+          {
+            members = {
+              ${name} = member-fn;
+            };
+            exports = [
+              {
+                uid = instance-meta.uid;
+                path = "members.${name}";
+                target = "${name}";
+              }
+            ];
+          }
+      ;  
+    };
+
+    add-members = {
+
+      __description = ''
+        Given a list of member specifications, this function constructs the
+        members and exports to add said members to an instance value.
+      '';
+
+      __functor = _: ctx: members:
+        let
+          acc = s: { members, exports }:
+            {
+              members = s.members // members;
+              exports = s.exports ++ exports;
+            }
+          ;
+          attr-to-member =
+            name: mk-member ctx { inherit name; spec = members.${name}; };
+        in
+          builtins.foldl'
+            acc
+            { members = {}; exports = []; }
+            (map attr-to-member (builtins.attrNames members))
+        ;
+    };
     
     type-instance-methods =
+      new-type:
       {
         type-decl,
         instance-meta
-      }: {
-      new = self: _: prim-input:
-        (type-decl { inherit Result; } prim-input).match {
-          result = prim: instance-meta // { inherit prim; };
-          error = throw;
-        }
-      ;
+      }@ctx:
+      let
+        defined-members = add-members ctx (type-decl.members { self-type = new-type; });
+        members = prim-lib.self-overridable defined-members.members null;
+        exports = defined-members.exports;
+        construct-value = prim:
+          let
+            ctx = instance-meta // { inherit exports members prim; };
+          in
+            value.extend [ctx]
+        ;
+      in
+      {
+        new = self: _: prim-input:
+          (type-decl { inherit Result; } prim-input).match {
+            result = construct-value;
+            error = throw;
+          }
+        ;
 
-      is-instance-value = self: value:
-        if prim-utils.is-tikal-value value
-        then builtins.hasAttr "${instance-meta.uid}" value
-        else (type-decl value).is_result
-      ;
-    };
-      
+        is-instance-value = self: value:
+          if prim-utils.is-tikal-value value
+          then builtins.hasAttr "${instance-meta.uid}" value
+          else (type-decl value).is_result
+        ;
+        
+        get-input-arg = get-input-arg-member;
+        out-type = out-type-member;
+      }
+    ;
+    
+    get-input-arg-member =
+      self: _: Result.error "No more ags"
+    ;
+
+    out-type-member = self: self;
 
     new-type-member =
       self: _: { module, package, ...}: { name, ... }@type-decl:
@@ -143,33 +225,47 @@
             inherit name module package;
           };
           instance-meta = prim-utils.mk-tikal-value "${name}-instance";
-          members = prim-lib.self-overridable (
-            type-instance-methods {
-              type-decl = type-decl;
-              instance-meta = instance-meta;
-            }
-          ) null;
+          members =
+            prim-lib.self-overridable (
+              type-instance-methods new-type {
+                type-decl = type-decl;
+                instance-meta = instance-meta;
+              }
+            )
+            null
+          ;
           meta = to-tikal-meta drv // {
             inherit instance-meta members;
-            exports = [
-              { uid = meta.uid; path = "members.new"; target = "__functor"; }
-            ];
+            exports = map (s: s // { uid = meta.uid; }) [
+                { path = "members.new"; target = "__functor"; }
+                { path = "members.get-input-arg"; target = "get-input-arg"; }
+                { path = "members.out-type"; target = "out-type"; }
+              ]
+            ;
           };
+          new-type = value.extend [meta];
         in
-          value.extend [meta]
+          new-type
       ;
 
     type-entity = type-meta // {
-      members = prim-lib.self-overridable {
-        new = new-type-member;
-      } null;
-      exports = [
-        { uid = type-meta.uid; path = "members.new"; target = "__functor"; }
+      members =
+        prim-lib.self-overridable {
+          new = new-type-member;
+          get-input-arg = get-input-arg-member;
+          out-type = out-type-member;
+        }
+        null;
+      exports = map (s: s // { uid = type-meta.uid; }) [
+        { path = "members.new"; target = "__functor"; }
       ];
     };
   in
     {
-      Type = value.extend [type-entity];
+      Types = module: builtins.mapAttrs (_: spec: spec module) {
+        Type = value.extend [type-entity];
+        Set = _: x: x;
+      };
     }
   ;
 }

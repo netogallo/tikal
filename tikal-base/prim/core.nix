@@ -492,7 +492,7 @@
                 module =
                   tikal.load-module
                     "${package-drv}/${path}"
-                    { type = Prim.Type module-meta; }
+                    (Prim.Types module-meta)
                 ;
               };
             modules = map load-module package-meta.modules;
