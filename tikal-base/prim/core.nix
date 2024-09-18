@@ -586,6 +586,9 @@
       ;
 
     in
-    { tikal = init-tikal-main tikal-main-package; }
+    {
+      tikal = init-tikal-main tikal-main-package;
+      tikal-value = import ./value.nix { inherit nixpkgs tikal-derivation; };
+    }
   ;
 }
