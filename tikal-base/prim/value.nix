@@ -38,31 +38,99 @@ rec {
         }
       '';
     };
-    extension-derivation = tikal-derivation-meta {
-      name = extension-name;
-      src = ./core/tikal-base;
-      tikalMetaTemplate = extension-tpl;
-    };
-    new-value-extension = prim: self: {
-      ${extension-derivation.uid} = {
-        uid = "${new-value-derivation.uid}";
-      };
-      prim = {
-        __override = throw "override todo";
-        __functor = _: _: prim;
-      };
-    };
+    new-extension-derivation = { name }:
+      tikal-derivation-meta {
+        inherit name;
+        src = ./core/tikal-base;
+        tikalMetaTemplate = extension-tpl;
+      }
+    ;
+    new-extension = { name, members, ...}@spec:
+      let
+        drv = tikal-derivation-meta {
+          name = name;
+          src = ./core/tikal-base;
+          tikalMetaTemplate = extension-tpl;
+        };
+      in
+        {
+          ${drv.uid} = drv;
+          __functor = _: members;
+        }
+    ;
+    extension-derivation = new-extension-derivation { name = extension-name; };
+    new-value-extension = prim-value:
+      {
+        ${extension-derivation.uid} = extension-derivation;
+        __functor = _: self: rec {
+          prim = {
+            __override = { member, ... }: ty:
+              if self.extends prim-extension
+              then prim ty
+              else member ty
+            ;
+            __functor = _: extension:
+              if self.extends prim-extension
+              then prim-value
+              else 
+                let
+                  name = extension.${extension-derivation.uid}.name;
+                in
+                  throw ''
+                    The extension "${name}" does not override the 'prim' member.
+                  ''
+            ;
+          };
+
+          extends = {
+            __functor = _: extension:
+              let
+                extension-uid = extension.${extension-derivation.uid}.uid;
+              in
+                if builtins.typeOf extension == "set"
+                  && builtins.hasAttr extension-derivation.uid extension
+                then true # builtins.hasAttr extension-uid self
+                else throw ''
+                  This function must be called with a Tikal extension as an argument.
+                ''
+            ;
+          };
+        };
+      }
+    ;
+    prim-extension = new-value-extension null;
+    apply-overrides = value: new-members:
+      let
+        override-member = current-member: new-member:
+          {
+            __functor = self: current-member.__override { member = new-member; };
+            __override = _: override-args:
+              current-member.__override (new-member.__override override-args)
+            ;
+          }
+        ;
+        apply-override = key: member:
+          if key != extension-derivation.uid && builtins.hasAttr key value
+          then override-member value.${key} member
+          else member
+        ;
+      in
+        builtins.mapAttrs apply-override new-members
+    ;
     extend = extension: value:
       let
-        members = extension value;
+        members = apply-overrides value (extension result);
         tikal-ctx = value.${new-value-derivation.uid};
+        result =
+          value // members // {
+            ${new-value-derivation.uid} = {
+              extensions = tikal-ctx.extensions ++ [ extension.${extension-derivation.uid}.uid ];
+            };
+          }
+        ;
       in
-        value // members // {
-          ${new-value-derivation.uid} = {
-            extensions = tikal-ctx.extensions ++ [ extension.${extension-derivation.uid}.uid ];
-          };
-        }
-      ;
+        result
+    ;
     new-value = {
       __functor = _: prim:
         let
@@ -78,7 +146,22 @@ rec {
           let
             expected = 42;
           in
-            (new-value expected).prim new-value-derivation == expected
+            (new-value expected).prim prim-extension == expected
+        ;
+        "It can override the 'prim' member" =
+          let
+            expected = "Prim is overriden";
+            extension = new-extension {
+              name = "test-override-prim";
+              members = _: {
+                prim = {
+                  __functor = _: _: expected;
+                };
+              };
+            };
+            instance = extend extension (new-value 42);
+          in
+            instance.prim extension == expected
         ;
       };
     };
@@ -139,7 +222,7 @@ rec {
       ;
   in
     test "value.nix" {
-      inherit new-value;
+      inherit new-value prim-extension;
     }
   ;
 }
