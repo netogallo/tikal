@@ -2,6 +2,7 @@
   nixpkgs
 }:
 let
+  lib = nixpkgs.lib;
   prim = import ./prim.nix { inherit nixpkgs; };
   stdenv = nixpkgs.stdenv;
 
@@ -11,19 +12,24 @@ let
       src = path;
       dependencies = map (dep: dep.drv) dependencies;
       dontUnpack = true;
-      dontBuild = true;
       nativeBuildInputs = with nixpkgs; [ jq ];
-      installPhase = ''
-        mkdir -p $out
-        cp -r $src/* $out
+      buildPhase = ''
+        mkdir -p build
+        cp -r $src/* build/
+        tikal_meta=build/tikal.json
 
-        modules=($(find $out -name "*.nix" -printf "%P\n"))
-        tikal_meta=$out/tikal.json
+        modules=($(find build -name "*.nix" -printf "%P\n"))
 
         for module in "''${modules[@]}"; do
-          jq '.modules += ["''${module}"]' $tikal_meta > $tikal_meta
+          mv $tikal_meta tikal.tmp
+          jq ".modules += [\"$module\"]" tikal.tmp > $tikal_meta
+          rm tikal.tmp
         done
-      ''; 
+      '';
+      installPhase = '' 
+        mkdir -p $out
+        cp -r build/* $out
+      '';
     }
   ;
 
@@ -60,9 +66,12 @@ let
     ;
   };
 
+  to-module-name = path: builtins.replaceStrings [ ".nix" "/" ] [ "" "." ] path;
+
   to-module-meta = pkg: module:
     {
-      
+      name = to-module-name module;
+      path = "${pkg.drv}/${module}";
     }
   ;
 
@@ -70,14 +79,20 @@ let
     let
       modules = map (to-module-meta pkg) pkg.modules;
     in
-      modules
+      modules ++ builtins.concatMap collect-modules pkg.dependencies
     ;
+
+  base-package = load-package ../base;
 
   load-modules = pkg:
     let
-      modules-meta = collect-modules pkg;
+      modules-meta = collect-modules pkg ++ collect-modules base-package;
+      module-scope = nixpkgs.newScope domain;
+      import-module = state: { name, path }:
+        prim.setAttrDeep name state (module-scope path {});
+      domain = lib.foldl import-module {} modules-meta;
     in
-    {}
+      domain
   ;
 
   tikal = {
@@ -92,8 +107,8 @@ let
       let
         pkg = load-package pkg-src;
       in
-      {}
+        load-modules pkg
     ;
   };
 in
-{}
+{ inherit tikal; }
