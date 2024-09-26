@@ -216,7 +216,7 @@ let
 
     __functor = _: obj:
       if typeOf obj == "string"
-      then string str
+      then string obj
       else throw "Cannot hash the object provided."
     ;
   };

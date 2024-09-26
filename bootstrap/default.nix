@@ -3,7 +3,7 @@
 }:
 let
   lib = nixpkgs.lib;
-  prim = import ./prim.nix { inherit nixpkgs; };
+  prim = import ./lib.nix { inherit nixpkgs; };
   stdenv = nixpkgs.stdenv;
 
   to-package-derivation = { dependencies, path, spec }:
@@ -86,10 +86,22 @@ let
 
   load-modules = pkg:
     let
+      tikal-meta = {
+        context-uid = pkg.uid;
+        tests-uid = "${pkg.uid}-tests";
+      };
+      context-factory = import ./context.nix { inherit nixpkgs; inherit tikal-meta; };
+      testlib-factory = import ./test.nix { inherit nixpkgs; inherit tikal-meta; };
       modules-meta = collect-modules pkg ++ collect-modules base-package;
       module-scope = nixpkgs.newScope domain;
-      import-module = state: { name, path }:
-        prim.setAttrDeep name state (module-scope path {});
+      import-module = state: { name, path }@module-meta:
+        let
+          test = testlib-factory { inherit module-meta; };
+          context = context-factory ({ inherit module-meta; } // test);
+          module-ctx = context // test;
+        in
+          prim.setAttrDeep name state (module-scope path module-ctx)
+      ;
       domain = lib.foldl import-module {} modules-meta;
     in
       domain
