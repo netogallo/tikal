@@ -98,7 +98,9 @@ let
           };
           ctx = base-ctx // apply-overrides base-ctx ctx;
         in
-          ctx
+          if builtins.typeOf value == "set" && builtins.hasAttr tikal-meta.context-uid value
+          then throw "Only primitive Nix values can be used to build a context."
+          else ctx
       ;
     };
 
@@ -195,6 +197,15 @@ let
           };
         in
           _assert.throws ((ctx-1 3).prim)
+      ;
+      "It cannot build a context value using a context value" = { _assert, ... }:
+        let
+          bad = context {
+            name = "bad";
+            members = {};
+          };
+        in
+          _assert.throws (bad (bad 42))
       ;
     };
   };
