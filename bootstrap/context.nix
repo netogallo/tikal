@@ -183,6 +183,19 @@ let
         in
           _assert.eq value.test ((3 * p1) + (3 * p2) + (3 * p3))
       ;
+      "It cannot override protected members" = { _assert, ... }:
+        let
+          ctx-1 = context {
+            name = "bad-ctx";
+            members = {
+              prim = {
+                __functor = _: ctx: "bad";
+              };
+            };
+          };
+        in
+          _assert.throws ((ctx-1 3).prim)
+      ;
     };
   };
 in

@@ -115,7 +115,7 @@ let
       be converted into a derivation.
     '';
 
-    __functor = _: pkg-src:
+    __functor = _: {}: pkg-src:
       let
         pkg = load-package pkg-src;
       in

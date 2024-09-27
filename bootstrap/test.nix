@@ -2,20 +2,46 @@
 let
   lib = nixpkgs.lib;
 
+  outcome = {
+    __functor = _: { test, success, message ? null }:
+      if success
+      then "Test '${test}': Ok"
+      else throw "Test '${test}': Error -- ${message}"
+    ;
+
+    success = test: outcome { test = test; success = true; };
+    error = { test, message }: outcome { test = test; success = false; message = message; };
+  };
+
   run-test = rec {
 
     test-context = { name, ... }: {
       _assert = {
         __functor = _: value:
           if value
-          then "${name}: Passed"
-          else throw "${name}: Failed"
+          then outcome.success name
+          else outcome.error { test = name; message = "Assertion failed"; }
         ;
 
         eq = v1: v2:
           if v1 == v2
-          then "${name}: Passed"
-          else throw "${name}: Failed -- Expected: ${builtins.toString v2}, Got: ${builtins.toString v1}"
+          then outcome.success name
+          else outcome.error {
+            test = name;
+            message = "Expected: ${builtins.toString v2}, Got: ${builtins.toString v1}";
+          }
+        ;
+
+        throws = f:
+          let
+            result = builtins.tryEval f;
+          in
+            if result.success
+            then outcome.error {
+              test = name;
+              message = "Expected an exception, but got: ${builtins.toString result.value}";
+            }
+            else outcome.success name
         ;
       };
     };
