@@ -5,11 +5,19 @@ let
   run-test = rec {
 
     test-context = { name, ... }: {
-      _assert = value:
-        if value
-        then "${name}: Passed"
-        else throw "${name}: Failed"
-      ;
+      _assert = {
+        __functor = _: value:
+          if value
+          then "${name}: Passed"
+          else throw "${name}: Failed"
+        ;
+
+        eq = v1: v2:
+          if v1 == v2
+          then "${name}: Passed"
+          else throw "${name}: Failed -- Expected: ${builtins.toString v2}, Got: ${builtins.toString v1}"
+        ;
+      };
     };
 
     __functor = _: { name, test }@spec: test (test-context spec);

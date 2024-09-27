@@ -42,17 +42,17 @@ let
               then [ members.${key} ]
               else []
           ;
-          initial-members = key: builtins.concatMap (get-member key) initial-ctx.contexts;
-          override-member-acc = current-member: new-member:
+          prev-member = key: lib.last (builtins.concatMap (get-member key) initial-ctx.contexts);
+          override-member-acc = new-member: current-member:
             {
               __functor = self: current-member.__override { super-ctx = initial; member = new-member; };
               __override = override-args: current-member.__override {
-                super-ctx = final;
+                super-ctx = initial;
                 member = (new-member.__override override-args);
               };
             }
           ;
-          override-member = { key, member }: lib.foldr override-member-acc member (initial-members key);
+          override-member = { key, member }: override-member-acc member (prev-member key);
           apply-override = key: member:
             if key != tikal-meta.context-uid && builtins.hasAttr key initial
             then override-member { inherit key member; } final
@@ -63,6 +63,23 @@ let
       ;
       __functor = self: value:
         let
+          extend = current-ctx: new-ctx:
+            let
+              prev-inner-ctx = current-ctx.${tikal-meta.context-uid};
+              result =
+                current-ctx //
+                (new-ctx.apply-overrides current-ctx result) //
+                {
+                  ${tikal-meta.context-uid} = prev-inner-ctx // {
+                    contexts = prev-inner-ctx.contexts ++ [ new-ctx.uid ];
+                    ${new-ctx.uid} = new-ctx.prim;
+                  };
+                  extend = extend result;
+                }
+              ;
+            in
+              result
+          ;
           base-ctx = {
             ${tikal-meta.context-uid} = {
               contexts = [ base-ctx-uid self.uid ];
@@ -77,13 +94,7 @@ let
             };
 
             prim = value;
-
-            extend = new-ctx:
-              let
-                result = ctx // new-ctx.apply-overrides ctx result;
-              in
-                result
-            ;
+            extend = extend ctx;
           };
           ctx = base-ctx // apply-overrides base-ctx ctx;
         in
@@ -136,6 +147,41 @@ let
           expected = 84 + 43;
         in
           _assert (value.test == expected)
+      ;
+      "It can override multiple times" = { _assert, ... }:
+        let
+          p1 = 41;
+          p2 = 47;
+          p3 = 31;
+          ctx-1 = context {
+            name = "override-1";
+            members = {
+              test = {
+                __functor = _: ctx: ctx.prim * p1;
+                __override = { super-ctx, member, ... }: ctx: super-ctx.test + member ctx;
+              };
+            };
+          };
+          ctx-2 = context {
+            name = "override-2";
+            members = {
+              test = {
+                __functor = _: ctx: ctx.prim * p2;
+                __override = { super-ctx, member, ... }: ctx: super-ctx.test + member ctx;
+              };
+            };
+          };
+          ctx-3 = context {
+            name = "override-3";
+            members = {
+              test = {
+                __functor = _: ctx: ctx.prim * p3;
+              };
+            };
+          };
+          value = ((ctx-1 3).extend ctx-2).extend ctx-3;
+        in
+          _assert.eq value.test ((3 * p1) + (3 * p2) + (3 * p3))
       ;
     };
   };
