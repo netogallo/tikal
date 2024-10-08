@@ -1,5 +1,6 @@
 { nixpkgs, tikal-meta }: { module-meta, test }:
 let
+  inherit (import ./lib.nix { inherit nixpkgs; }) getAttrDeep;
   lib = nixpkgs.lib;
   base-ctx-uid = "${tikal-meta.context-uid}-base";
 
@@ -18,11 +19,14 @@ let
         contexts = [];
       };
 
-      prim = spec;
+      focal = spec;
 
       fullname = "${module-meta.name}.${spec.name}";
 
       uid = "${module-meta.name}.${spec.name}";
+
+      surrounds = value:
+        getAttrDeep "${tikal-meta.context-uid}.${uid}" value != null;
 
       members =
         let
@@ -72,7 +76,7 @@ let
                 {
                   ${tikal-meta.context-uid} = prev-inner-ctx // {
                     contexts = prev-inner-ctx.contexts ++ [ new-ctx.uid ];
-                    ${new-ctx.uid} = new-ctx.prim;
+                    ${new-ctx.uid} = new-ctx.focal;
                   };
                   extend = extend result;
                 }
@@ -87,30 +91,32 @@ let
               ${base-ctx-uid} = {
                 name = "base";
                 members = {
-                  prim = member-defaults { fullname = "${self.fullname}.prim"; };
+                  focal = member-defaults { fullname = "${self.fullname}.focal"; };
                   extend = member-defaults { fullname = "${self.fullname}.extend"; };
                 };
               };
             };
 
-            prim = value;
+            focal =
+              if builtins.hasAttr "__functor" spec
+              then spec value
+              else value
+            ;
             extend = extend ctx;
           };
           ctx = base-ctx // apply-overrides base-ctx ctx;
         in
-          if builtins.typeOf value == "set" && builtins.hasAttr tikal-meta.context-uid value
-          then throw "Only primitive Nix values can be used to build a context."
-          else ctx
+          ctx
       ;
     };
 
     __tests = {
-      "It contains a prim member" = { _assert, ...}:
+      "It contains a 'focal' member" = { _assert, ...}:
         let
-          ctx = context { name = "prim-test"; members = {}; };
+          ctx = context { name = "focal-test"; members = {}; };
           expected = 42;
         in
-          _assert ((ctx expected).prim == expected)
+          _assert ((ctx expected).focal == expected)
       ;
       "It can declare new members" = { _assert, ... }:
         let
@@ -118,7 +124,7 @@ let
             name = "declare-member-test";
             members = {
               test = {
-                __functor = _: ctx: ctx.prim + 1;
+                __functor = _: ctx: ctx.focal + 1;
               };
             };
           };
@@ -132,7 +138,7 @@ let
             name = "override-ctx1";
             members = {
               test = {
-                __functor = _: ctx: ctx.prim + 1;
+                __functor = _: ctx: ctx.focal + 1;
                 __override = { super-ctx, member, ... }: ctx: super-ctx.test + member ctx;
               };
             };
@@ -141,7 +147,7 @@ let
             name = "override-ctx2";
             members = {
               test = {
-                __functor = _: ctx: ctx.prim * 2;
+                __functor = _: ctx: ctx.focal * 2;
               };
             };
           };
@@ -159,7 +165,7 @@ let
             name = "override-1";
             members = {
               test = {
-                __functor = _: ctx: ctx.prim * p1;
+                __functor = _: ctx: ctx.focal * p1;
                 __override = { super-ctx, member, ... }: ctx: super-ctx.test + member ctx;
               };
             };
@@ -168,7 +174,7 @@ let
             name = "override-2";
             members = {
               test = {
-                __functor = _: ctx: ctx.prim * p2;
+                __functor = _: ctx: ctx.focal * p2;
                 __override = { super-ctx, member, ... }: ctx: super-ctx.test + member ctx;
               };
             };
@@ -177,7 +183,7 @@ let
             name = "override-3";
             members = {
               test = {
-                __functor = _: ctx: ctx.prim * p3;
+                __functor = _: ctx: ctx.focal * p3;
               };
             };
           };
@@ -190,22 +196,26 @@ let
           ctx-1 = context {
             name = "bad-ctx";
             members = {
-              prim = {
+              focal = {
                 __functor = _: ctx: "bad";
               };
             };
           };
         in
-          _assert.throws ((ctx-1 3).prim)
+          _assert.throws ((ctx-1 3).focal)
       ;
-      "It cannot build a context value using a context value" = { _assert, ... }:
+      "It can transform the focal" = { _assert, ... }:
         let
-          bad = context {
-            name = "bad";
+          spec = {
+            name = "transform-focal-ctx";
+            __functor = _: value: value + 1;
             members = {};
           };
+          input = 41;
+          expected = spec input;
+          ctx = context spec;
         in
-          _assert.throws (bad (bad 42))
+          _assert ((ctx 41).focal == expected)
       ;
     };
   };

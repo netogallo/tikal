@@ -2,6 +2,12 @@
 let
   lib = nixpkgs.lib;
 
+  pretty-print = value:
+    if builtins.typeOf value == "set"
+    then "{ " + (lib.concatStringsSep ", " (builtins.attrNames value)) + " }"
+    else builtins.toString value
+  ;
+
   outcome = {
     __functor = _: { test, success, message ? null }:
       if success
@@ -28,7 +34,7 @@ let
           then outcome.success name
           else outcome.error {
             test = name;
-            message = "Expected: ${builtins.toString v2}, Got: ${builtins.toString v1}";
+            message = "Expected: ${pretty-print v2}, Got: ${pretty-print v1}";
           }
         ;
 
@@ -39,7 +45,7 @@ let
             if result.success
             then outcome.error {
               test = name;
-              message = "Expected an exception, but got: ${builtins.toString result.value}";
+              message = "Expected an exception, but got: ${pretty-print result.value}";
             }
             else outcome.success name
         ;

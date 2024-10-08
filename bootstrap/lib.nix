@@ -104,6 +104,32 @@ let
       failC = _: false;
     };
 
+  pretty-print = value:
+    let
+      render = v:
+        if builtins.typeOf v == "lambda"
+        then "<lambda>"
+        else if builtins.typeOf v == "set"
+        then "{ ... }"
+        else if builtins.typeOf v == "list"
+        then "[ ... ]"
+        else builtins.toString v
+      ;
+      set-items =
+        builtins.concatStringsSep
+        ", "
+        (map (k: "${k} = ${render (builtins.getAttr k value)}")
+        (attrNames value));
+      set-str = "{${set-items}}";
+      list-str = "[${builtins.concatStringsSep ", " (map render value)}]";
+    in
+      if builtins.typeOf value == "set"
+      then set-str
+      else if builtins.typeOf value == "list"
+      then list-str
+      else render value
+    ;
+
   modify = patches: value:
     let
       paths = findPaths isPatch patches;
@@ -241,7 +267,7 @@ in
     findPaths
     getAttrDeep getAttrDeepPoly getAttrDeepStrict
     hash
-    project
+    pretty-print project
     self-overridable setAttrDeep
     tests;
 }
