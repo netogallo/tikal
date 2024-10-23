@@ -90,21 +90,37 @@ let
         context-uid = pkg.uid;
         tests-uid = "${pkg.uid}-tests";
       };
-      context-factory = import ./context.nix { inherit nixpkgs; inherit tikal-meta; };
-      testlib-factory = import ./test.nix { inherit nixpkgs; inherit tikal-meta; };
+      prim-context = { inherit nixpkgs; inherit tikal-meta; inherit prim; };
+      context-factory = import ./context.nix prim-context;
+      testlib-factory = import ./test.nix prim-context; 
+      type-factory = import ./type.nix prim-context; 
       modules-meta = collect-modules pkg ++ collect-modules base-package;
       module-scope = nixpkgs.newScope domain;
-      import-module = state: { name, path }@module-meta:
+      import-module = { tests, state }: { name, path }@module-meta:
         let
           test = testlib-factory { inherit module-meta; };
           context = context-factory ({ inherit module-meta; } // test);
-          module-ctx = context // test;
+          type = type-factory ({ inherit module-meta; } // test // context);
+          module-ctx = context // test // type;
+          module = module-scope path module-ctx;
+          module-tests =
+            if builtins.hasAttr tikal-meta.tests-uid module
+            then [ module.${tikal-meta.tests-uid} ]
+            else []
+          ;
         in
-          prim.setAttrDeep name state (module-scope path module-ctx)
+          {
+            state = prim.setAttrDeep name state module;
+            tests = tests ++ module-tests; 
+          }
       ;
-      domain = lib.foldl import-module {} modules-meta;
+      domain = lib.foldl import-module { state = {}; tests = []; } modules-meta;
+      tests-drv = nixpkgs.symlinkJoin {
+        name = tikal-meta.tests-uid;
+        paths = domain.tests;
+      };
     in
-      domain
+      domain.state // { ${tikal-meta.tests-uid} = tests-drv; }
   ;
 
   tikal = {

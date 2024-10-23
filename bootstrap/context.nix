@@ -1,4 +1,4 @@
-{ nixpkgs, tikal-meta }: { module-meta, test }:
+{ nixpkgs, tikal-meta, ... }: { module-meta, test, ... }:
 let
   inherit (import ./lib.nix { inherit nixpkgs; }) getAttrDeep;
   lib = nixpkgs.lib;
@@ -23,10 +23,10 @@ let
 
       fullname = "${module-meta.name}.${spec.name}";
 
-      uid = "${module-meta.name}.${spec.name}";
+      uid = (builtins.hashString "sha256" "${module-meta.name}.${spec.name}") + "-${spec.name}";
 
       surrounds = value:
-        getAttrDeep "${tikal-meta.context-uid}.${uid}" value != null;
+        getAttrDeep [ tikal-meta.context-uid uid] value != null;
 
       members =
         let
@@ -216,6 +216,30 @@ let
           ctx = context spec;
         in
           _assert ((ctx 41).focal == expected)
+      ;
+      "It can have a __funcotr member" = { _assert, ... }:
+        let
+          fn-ctx = context {
+            name = "functor";
+            members = {
+              __functor = {
+                __functor = _: ctx: _: v: ctx.focal v;
+              };
+            };
+          };
+          fn = x: x*x;
+        in
+          _assert.eq (fn-ctx fn 5) (fn 5)
+      ;
+      "It can check if a context surronds a value" = { _assert, ... }:
+        let
+          ctx = context {
+            name = "surronds";
+            members = {};
+          };
+          v = ctx 42;
+        in
+          _assert (ctx.surrounds v)
       ;
     };
   };

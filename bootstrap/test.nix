@@ -1,4 +1,4 @@
-{ nixpkgs, tikal-meta }: { module-meta }:
+{ nixpkgs, tikal-meta, prim, ... }: { module-meta, ... }:
 let
   lib = nixpkgs.lib;
 
@@ -61,20 +61,44 @@ let
       the "${module-meta.name}" module.
     '';
     
-    __functor = _: value:
+    __functor = _: key: value:
       let
         tests = value.__tests;
         run-test-wrapper = test: run-test { name = test; test = tests.${test}; };
         outcomes = builtins.map run-test-wrapper (builtins.attrNames tests);
         result = lib.foldl (s: t: "${s}\n${t}") "" outcomes; 
+        result-drv = nixpkgs.writeTextFile rec {
+          name = "${module-meta.name}.${key}.txt";
+          text = result;
+          destination = "/tikal/tests/${name}";
+        };
       in
         if builtins.hasAttr "__tests" value
-        then builtins.trace result (value // { ${tikal-meta.tests-uid} = result; })
+        then builtins.trace result (value // { ${tikal-meta.tests-uid} = result-drv; })
         else value
       ;
   };
 
-  test = builtins.mapAttrs (key: value: run-tests value);
+  test = {
+    __functor = _: mdl:
+      let
+        tested-mdl = builtins.mapAttrs run-tests mdl;
+        get-test-results = _: value:
+          if builtins.hasAttr tikal-meta.tests-uid value
+          then [ value.${tikal-meta.tests-uid} ]
+          else []
+        ;
+        collected-tests = lib.concatLists (
+          lib.mapAttrsToList get-test-results tested-mdl
+        );
+        tests-drv = nixpkgs.symlinkJoin {
+          name = "${module-meta.name}-tests";
+          paths = collected-tests;
+        };
+      in
+        tested-mdl // { ${tikal-meta.tests-uid} = tests-drv; }
+    ;
+  };
 in
 {
   inherit test;

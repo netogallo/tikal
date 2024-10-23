@@ -19,11 +19,11 @@ let
     result will depend on how the strict parameter is set.
     '';
 
-    __functor = self: { strict ? false }: path-any: obj:
+    __functor = self: { strict ? false, default ? null }: path-any: obj:
       let
         path = to-list-path path-any;
         path-str = concatStringsSep "." path;
-        empty = if strict then throw "Attribute '${path-str}' not in object." else null;
+        empty = if strict then throw "Attribute '${path-str}' not in object." else default;
         cata = s: a:
           if s == null || builtins.typeOf s != "set" || !(hasAttr a s)
 	        then empty
