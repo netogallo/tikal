@@ -53,35 +53,77 @@ let
     };
   };
 
-  type = rec {
+  String = context {
+    name = "String";
+
+    __functor = str:
+      if builtins.typeOf str == "string"
+      then str
+      else if String.surrounds str
+      then str.focal
+      else throw "Expected a string, got ${pretty-print str}"
+    ;
+  };
+  
+  make-member = {
+    __description = "Convert the spec of a type member into the spec of a context member.";
+
+    __functor = _: spec:
+      {
+        __functor = _: ctx: spec.type spec ctx;
+      }
+    ;
+  };
+
+  Type = context {
+    name = "Type";
+
+    __functor = _: { name, members, ... }@spec: spec;
+
+    members = {
+
+      name = {
+        __description = "Gets the name of the type.";
+        __functor = _: ctx: String ctx.focal.name;
+      };
+
+      instance-context = {
+        __description = "The context which surrounds all instances of the type";
+        __functor = _: ctx:
+          let
+            spec = ctx.focal;
+            members = builtins.mapAttrs (_: v: make-member v) spec.members;
+            ctor-attrs = {
+              __functor = _: make-member (spec.__functor);
+            };
+          in
+          context (
+            {
+              name = "${ctx.name}-instance";
+              inherit members;
+            } //
+            (if builtins.hasAttr "__functor" spec then ctor-attrs else {})
+          )
+        ;
+      };
+
+      includes = {
+        __description = "Check if the given value belongs to this Type";
+        __functor = _: ctx: value: ctx.instance-context.surrounds value;
+      };
+
+      __functor = {
+        __functor = _: ctx: _: ctx.instance-context;
+      };
+    };
+  };
+
+  type = {
     __description = ''
       Define a new type by providing a type spec.
     '';
 
-    make-member = {
-      __description = ''
-        Convert the spec of a type member into the spec of a context member.
-      '';
-
-      __functor = _: spec:
-        {
-          __functor = _: ctx: spec.type spec ctx;
-        }
-      ;
-    };
-
-    __functor = _: spec:
-      let
-        ctor-attrs = {
-          __functor = _: make-member (spec.__functor);
-        };
-        members = builtins.mapAttrs (_: v: make-member v) spec.members;
-      in
-      {
-        inherit members;
-        name = spec.name;
-      }
-      // (if builtins.hasAttr "__functor" spec then ctor-attrs else {});
+    __functor = _: Type;
 
     __tests = {
       "It can create an Int instance" = { _assert }:
@@ -113,7 +155,7 @@ let
           fn = arr (x: y: x "+" y);
         in
           _assert.eq (fn 2 3).focal 5
-        ;
+      ;
 
       "It can define a simple type" = { _assert }:
         let
@@ -130,7 +172,10 @@ let
           };
           value = Dummy 5;
         in
-          _assert.eq value.focal 10 
+          _assert.all [
+            (_assert.eq value.focal.focal 10)
+            (_assert (Dummy.includes value))
+          ]
       ;
     };
   };

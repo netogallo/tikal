@@ -32,13 +32,13 @@ let
         all =
           let
             succ = outcome.success name;
-            acc = s: n:
+            acc = n: s:
               if n == succ
               then succ
               else outcome.error { test = name; message = "Assertion failed"; }
             ;
           in
-            checks: lib.foldl acc succ checks
+            checks: lib.foldr acc succ checks
         ;
 
         eq = v1: v2:
