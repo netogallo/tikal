@@ -84,13 +84,13 @@ let
 
   base-package = load-package ../base;
 
-  load-modules = pkg:
+  load-modules = { tests-prop ? null, verbose-tests ? false }@config: pkg:
     let
       tikal-meta = {
         context-uid = pkg.uid;
         tests-uid = "${pkg.uid}-tests";
       };
-      prim-context = { inherit nixpkgs; inherit tikal-meta; inherit prim; };
+      prim-context = { inherit nixpkgs; inherit tikal-meta; inherit prim; inherit config; };
       context-factory = import ./context.nix prim-context;
       testlib-factory = import ./test.nix prim-context; 
       type-factory = import ./type.nix prim-context; 
@@ -119,8 +119,15 @@ let
         name = tikal-meta.tests-uid;
         paths = domain.tests;
       };
+      tests-context =
+        if tests-prop == null
+        then {}
+        else { ${tests-prop} = tests-drv; }
+      ;
     in
-      domain.state // { ${tikal-meta.tests-uid} = tests-drv; }
+      domain.state
+      // { ${tikal-meta.tests-uid} = tests-drv; }
+      // tests-context
   ;
 
   tikal = {
@@ -131,11 +138,11 @@ let
       be converted into a derivation.
     '';
 
-    __functor = _: {}: pkg-src:
+    __functor = _: config: pkg-src:
       let
         pkg = load-package pkg-src;
       in
-        load-modules pkg
+        load-modules config pkg
     ;
   };
 in

@@ -1,4 +1,4 @@
-{ nixpkgs, tikal-meta, prim, ... }: { module-meta, ... }:
+{ nixpkgs, tikal-meta, prim, config, ... }: { module-meta, ... }:
 let
   lib = nixpkgs.lib;
 
@@ -27,6 +27,18 @@ let
           if value
           then outcome.success name
           else outcome.error { test = name; message = "Assertion failed"; }
+        ;
+
+        all =
+          let
+            succ = outcome.success name;
+            acc = s: n:
+              if n == succ
+              then succ
+              else outcome.error { test = name; message = "Assertion failed"; }
+            ;
+          in
+            checks: lib.foldl acc succ checks
         ;
 
         eq = v1: v2:
@@ -72,9 +84,14 @@ let
           text = result;
           destination = "/tikal/tests/${name}";
         };
+        apply-tests = res: value:
+          if config.verbose-tests
+          then builtins.trace res value
+          else value
+        ;
       in
         if builtins.hasAttr "__tests" value
-        then builtins.trace result (value // { ${tikal-meta.tests-uid} = result-drv; })
+        then apply-tests result (value // { ${tikal-meta.tests-uid} = result-drv; })
         else value
       ;
   };

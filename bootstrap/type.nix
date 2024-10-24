@@ -22,6 +22,10 @@ let
         __functor = _: ctx: arg-any: Int(ctx.focal + (Int arg-any).focal);
       };
 
+      raw-string = {
+        __functor = _: ctx: builtins.toString ctx.focal;
+      };
+
       __functor = {
         __functor = _: ctx: _: op: ctx."${op}";
       };
@@ -89,25 +93,45 @@ let
           arr = Arrow { from = Int; to = Int; } fn;
         in
           _assert.eq (arr 5).focal 47
+      ;
+
+      "The Arrow checks the input and return type" = { _assert }:
+        let
+          fn1 = arr (x: x "+" 5);
+          fn2 = arr (x: builtins.toString x.focal);
+          arr = Arrow { from = Int; to = Int; };
+        in
+          _assert.all [
+            (_assert.throws (fn1 "wrong").focal)
+            (_assert.throws (fn2 3).raw-string)
+          ]
         ;
 
-#      "It can define a simple type" = { _assert }:
-#        let
-#          Dummy = type {
-#            name = "Dummy";
-#
-#            __functor = {
-#              type = Arrow { from = Int; to = Int; }; #[Int "->" Int];
-#              __functor = _: i: i "*" 2;
-#            };
-#
-#            members = {
-#            };
-#          };
-#          value = Dummy 5;
-#        in
-#          _assert.eq value.focal 10 
-#      ;
+      "The Arrows can be nested" = { _assert }:
+        let
+          arr = Arrow { from = Int; to = Arrow { from = Int; to = Int; }; };
+          fn = arr (x: y: x "+" y);
+        in
+          _assert.eq (fn 2 3).focal 5
+        ;
+
+      "It can define a simple type" = { _assert }:
+        let
+          Dummy = type {
+            name = "Dummy";
+
+            __functor = {
+              type = Arrow { from = Int; to = Int; }; #[Int "->" Int];
+              __functor = _: i: i "*" 2;
+            };
+
+            members = {
+            };
+          };
+          value = Dummy 5;
+        in
+          _assert.eq value.focal 10 
+      ;
     };
   };
 in
