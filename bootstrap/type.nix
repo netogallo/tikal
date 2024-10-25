@@ -56,16 +56,16 @@ let
 
   Arrow = base-type-ctx { name = "Arrow"; } {
 
-    __functor = _: { from, to }: { inherit from to; };
+    __functor = _: { From, To }: { inherit From To; };
 
     members = {
 
       from = {
-        __functor = _: ctx: ctx.focal.from;
+        __functor = _: ctx: ctx.focal.From;
       };
 
       to = {
-        __functor = _: ctx: ctx.focal.to;
+        __functor = _: ctx: ctx.focal.To;
       };
 
       __functor = {
@@ -101,7 +101,21 @@ let
             else throw "Expected a List of Item, got ${pretty-print items}"
           ;
 
-          members = {};
+          members = {
+
+            at = {
+              __description = "Returns the item at the given index.";
+              __functor = _: ctx: Arrow { From = Int; To = Item; } (i: lib.elemAt ctx.focal i.focal); 
+            };
+
+            "!!" = {
+              __functor = _: ctx: ctx.at;
+            };
+
+            __functor = {
+              __functor = _: ctx: _: prop: ctx.${prop};
+            };
+          };
         };
       in
         item-list
@@ -196,13 +210,13 @@ let
     __functor = _: Type;
 
     __tests = {
-      "It can create an Int instance" = { _assert }:
+      "It can create an Int instance" = { _assert, ... }:
         _assert.eq (Int 42).focal 42
       ;
-      "It can create an Arrow instance" = { _assert }:
+      "It can create an Arrow instance" = { _assert, ... }:
         let
           fn = x: x "+" 42;
-          arr = Arrow { from = Int; to = Int; } fn;
+          arr = Arrow { From = Int; To = Int; } fn;
         in
           _assert.all [
             (_assert.eq (arr 5).focal 47)
@@ -210,11 +224,11 @@ let
           ]
       ;
 
-      "The Arrow checks the input and return type" = { _assert }:
+      "The Arrow checks the input and return type" = { _assert, ... }:
         let
           fn1 = arr (x: x "+" 5);
           fn2 = arr (x: builtins.toString x.focal);
-          arr = Arrow { from = Int; to = Int; };
+          arr = Arrow { From = Int; To = Int; };
         in
           _assert.all [
             (_assert.throws (fn1 "wrong").focal)
@@ -222,21 +236,21 @@ let
           ]
         ;
 
-      "The Arrows can be nested" = { _assert }:
+      "The Arrows can be nested" = { _assert, ... }:
         let
-          arr = Arrow { from = Int; to = Arrow { from = Int; to = Int; }; };
+          arr = Arrow { From = Int; To = Arrow { From = Int; To = Int; }; };
           fn = arr (x: y: x "+" y);
         in
           _assert.eq (fn 2 3).focal 5
       ;
 
-      "It can define a simple type" = { _assert }:
+      "It can define a simple type" = { _assert, ... }:
         let
           Dummy = type {
             name = "Dummy";
 
             __functor = {
-              type = Arrow { from = Int; to = Int; }; #[Int "->" Int];
+              type = Arrow { From = Int; To = Int; }; #[Int "->" Int];
               __functor = _: i: i "*" 2;
             };
 
@@ -251,7 +265,7 @@ let
           ]
       ;
 
-      "Types can define member functions" = { _assert }:
+      "Types can define member functions" = { _assert, ... }:
         let
           Member = type {
             name = "Member";
@@ -259,18 +273,20 @@ let
             members = {
 
               replicate = {
-                type = Arrow { from = Int; to = List { Item = Int; }; };
+                type = Arrow { From = Int; To = List { Item = Int; }; };
                 __functor = _: ctx: times: map (_: ctx.focal) (lib.range 1 times.focal);
               };
             };
           };
-          value = Member 6;
+          value = Member 5;
+          input = Int 5;
+          expected = input;
         in
-          _assert.eq (value.replicate 5).focal []
+          _assert.eq ((value.replicate 3) "!!" 1).focal expected.focal
       ;
     };
   };
 in
 test {
-  inherit Int String Arrow type;
+  inherit List Int String Arrow type;
 }
