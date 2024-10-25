@@ -1,6 +1,7 @@
-{ nixpkgs, tikal-meta, ... }: { module-meta, context, test, ... }:
+{ nixpkgs, tikal-meta, prim, ... }: { module-meta, context, test, pretty-print, ... }:
 let
-  inherit (import ./lib.nix { inherit nixpkgs; }) pretty-print;
+  inherit (prim) pretty-print;
+  lib = nixpkgs.lib;
   base-type-ctx = { name }: context {
     name = name;
     __functor = _: arg: context (arg // { name = "${name}-instance"; });
@@ -22,6 +23,7 @@ let
       };
     };
   };
+
   Int = base-type-ctx { name = "Int"; } {
 
     __functor = _: value:
@@ -74,7 +76,7 @@ let
 
   String = base-type-ctx { name = "String"; } {
 
-    __functor = str:
+    __functor = _: str:
       if builtins.typeOf str == "string"
       then str
       else if String.includes str
@@ -85,13 +87,65 @@ let
     members = {
     };
   };
+
+  List = base-type-ctx { name = "List$1"; } {
+
+    __functor = _: { Item }:
+      let
+        item-list = base-type-ctx { name = "List$Item"; } {
+          __functor = _: items:
+            if builtins.typeOf items == "list"
+            then map Item items
+            else if item-list.includes items
+            then item-list.focal
+            else throw "Expected a List of Item, got ${pretty-print items}"
+          ;
+
+          members = {};
+        };
+      in
+        item-list
+    ;
+
+    members = {
+
+      __functor = {
+        __description = "Constructs a list of the specified 'Item' type.";
+        __functor = _: ctx: _: ctx.focal;
+      };
+    };
+  };
   
+  make-ctor = {
+    __description = "Convert the spec of a type constructor into the spec of a context constructor.";
+
+    __functor = _: spec:
+      let
+        type =
+          if builtins.hasAttr "type" spec
+          then spec.type
+          else throw "Member function definitions must have a 'type' attribute."
+        ;
+      in
+      {
+        __functor = _: ctx: spec.type spec ctx;
+      }
+    ;
+  };
+
   make-member = {
     __description = "Convert the spec of a type member into the spec of a context member.";
 
     __functor = _: spec:
+      let 
+        type =
+          if builtins.hasAttr "type" spec
+          then spec.type
+          else throw "Member function definitions must have a 'type' attribute."
+        ;
+      in
       {
-        __functor = _: ctx: spec.type spec ctx;
+        __functor = _: ctx: spec.type (spec ctx);
       }
     ;
   };
@@ -110,7 +164,7 @@ let
             spec = ctx.focal;
             members = builtins.mapAttrs (_: v: make-member v) spec.members;
             ctor-attrs = {
-              __functor = _: make-member (spec.__functor);
+              __functor = _: make-ctor (spec.__functor);
             };
           in
           context (
@@ -195,6 +249,24 @@ let
             (_assert.eq value.focal.focal 10)
             (_assert (Dummy.includes value))
           ]
+      ;
+
+      "Types can define member functions" = { _assert }:
+        let
+          Member = type {
+            name = "Member";
+
+            members = {
+
+              replicate = {
+                type = Arrow { from = Int; to = List { Item = Int; }; };
+                __functor = _: ctx: times: map (_: ctx.focal) (lib.range 1 times.focal);
+              };
+            };
+          };
+          value = Member 6;
+        in
+          _assert.eq (value.replicate 5).focal []
       ;
     };
   };

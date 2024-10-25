@@ -1,12 +1,7 @@
 { nixpkgs, tikal-meta, prim, config, ... }: { module-meta, ... }:
 let
   lib = nixpkgs.lib;
-
-  pretty-print = value:
-    if builtins.typeOf value == "set"
-    then "{ " + (lib.concatStringsSep ", " (builtins.attrNames value)) + " }"
-    else builtins.toString value
-  ;
+  inherit (prim) pretty-print;
 
   outcome = {
     __functor = _: { test, success, message ? null }:
@@ -118,5 +113,5 @@ let
   };
 in
 {
-  inherit test;
+  inherit test pretty-print;
 }
