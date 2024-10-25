@@ -1,13 +1,33 @@
 { nixpkgs, tikal-meta, ... }: { module-meta, context, test, ... }:
 let
   inherit (import ./lib.nix { inherit nixpkgs; }) pretty-print;
-  Int = context {
-    name = "Int";
+  base-type-ctx = { name }: context {
+    name = name;
+    __functor = _: arg: context (arg // { name = "${name}-instance"; });
+    members = {
+
+      instance-context = {
+        __description = "The context which surrounds all instances of the type";
+        __functor = _: ctx: ctx.focal;
+      };
+      
+      includes = {
+        __description = "Check if the given value belongs to this Type";
+        __functor = _: ctx: value: ctx.instance-context.surrounds value;
+      };
+
+      __functor = {
+        __description = "Construct an instance of the type captured by this context.";
+        __functor = _: ctx: _: ctx.focal;
+      };
+    };
+  };
+  Int = base-type-ctx { name = "Int"; } {
 
     __functor = _: value:
       if builtins.typeOf value == "int"
       then value
-      else if Int.surrounds value
+      else if Int.includes value
       then value.focal
       else throw "Expected an integer, got ${pretty-print value}"
     ;
@@ -32,8 +52,7 @@ let
     };
   };
 
-  Arrow = context {
-    name = "Arrow";
+  Arrow = base-type-ctx { name = "Arrow"; } {
 
     __functor = _: { from, to }: { inherit from to; };
 
@@ -53,16 +72,18 @@ let
     };
   };
 
-  String = context {
-    name = "String";
+  String = base-type-ctx { name = "String"; } {
 
     __functor = str:
       if builtins.typeOf str == "string"
       then str
-      else if String.surrounds str
+      else if String.includes str
       then str.focal
       else throw "Expected a string, got ${pretty-print str}"
     ;
+
+    members = {
+    };
   };
   
   make-member = {
@@ -82,11 +103,6 @@ let
 
     members = {
 
-      name = {
-        __description = "Gets the name of the type.";
-        __functor = _: ctx: String ctx.focal.name;
-      };
-
       instance-context = {
         __description = "The context which surrounds all instances of the type";
         __functor = _: ctx:
@@ -99,7 +115,7 @@ let
           in
           context (
             {
-              name = "${ctx.name}-instance";
+              name = "${spec.name}-instance";
               inherit members;
             } //
             (if builtins.hasAttr "__functor" spec then ctor-attrs else {})
@@ -134,7 +150,10 @@ let
           fn = x: x "+" 42;
           arr = Arrow { from = Int; to = Int; } fn;
         in
-          _assert.eq (arr 5).focal 47
+          _assert.all [
+            (_assert.eq (arr 5).focal 47)
+            (_assert.eq (arr (Int 5)).focal 47)
+          ]
       ;
 
       "The Arrow checks the input and return type" = { _assert }:
@@ -181,5 +200,5 @@ let
   };
 in
 test {
-  inherit type;
+  inherit Int String Arrow type;
 }

@@ -26,7 +26,7 @@ let
       uid = (builtins.hashString "sha256" "${module-meta.name}.${spec.name}") + "-${spec.name}";
 
       surrounds = value:
-        getAttrDeep [ tikal-meta.context-uid uid] value != null;
+        getAttrDeep [ tikal-meta.context-uid uid ] value != null;
 
       members =
         let
@@ -76,7 +76,7 @@ let
                 {
                   ${tikal-meta.context-uid} = prev-inner-ctx // {
                     contexts = prev-inner-ctx.contexts ++ [ new-ctx.uid ];
-                    ${new-ctx.uid} = new-ctx.focal;
+                    ${new-ctx.uid} = new-ctx;
                   };
                   extend = extend result;
                 }

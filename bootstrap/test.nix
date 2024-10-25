@@ -33,7 +33,7 @@ let
           let
             succ = outcome.success name;
             acc = n: s:
-              if n == succ
+              if n == succ && s == succ
               then succ
               else outcome.error { test = name; message = "Assertion failed"; }
             ;
