@@ -4,6 +4,18 @@ let
   lib = nixpkgs.lib;
   base-ctx-uid = "${tikal-meta.context-uid}-base";
 
+  simple-override = override: { key, initial-ctx, final-ctx, current-member, new-member, ... }:
+    {
+      __functor = self:
+        let
+          self = final-ctx // { ${key} = new-member final-ctx; };
+          super = initial-ctx // { ${key} = current-member initial-ctx; };
+        in
+          _: override { inherit self super; }
+      ;
+    }
+  ;
+
   member-defaults = { fullname }: {
     __override = _: throw "The member '${fullname}' does not allow overriding.";
   };
@@ -46,17 +58,21 @@ let
               then [ members.${key} ]
               else []
           ;
-          prev-member = key: lib.last (builtins.concatMap (get-member key) initial-ctx.contexts);
-          override-member-acc = new-member: current-member:
-            {
-              __functor = self: current-member.__override { super-ctx = initial; member = new-member; };
-              __override = override-args: current-member.__override {
-                super-ctx = initial;
-                member = (new-member.__override override-args);
-              };
-            }
+          prev-members = key: (builtins.concatMap (get-member key) initial-ctx.contexts);
+          prev-member = key: lib.last (prev-members key);
+          override-member = { key, member }:
+            let
+              prev = prev-members key;
+              acc = current-member: new-member:
+                current-member.__override {
+                  inherit key current-member new-member;
+                  initial-ctx = initial;
+                  final-ctx = final;
+                }
+              ;
+            in
+              lib.foldr acc member prev
           ;
-          override-member = { key, member }: override-member-acc member (prev-member key);
           apply-override = key: member:
             if key != tikal-meta.context-uid && builtins.hasAttr key initial
             then override-member { inherit key member; } final
@@ -139,7 +155,7 @@ let
             members = {
               test = {
                 __functor = _: ctx: ctx.focal + 1;
-                __override = { super-ctx, member, ... }: ctx: super-ctx.test + member ctx;
+                __override = simple-override ({ super, self, ... }: super.test + self.test);
               };
             };
           };
@@ -159,14 +175,14 @@ let
       "It can override multiple times" = { _assert, ... }:
         let
           p1 = 41;
-          p2 = 47;
+          p2 = 101;
           p3 = 31;
           ctx-1 = context {
             name = "override-1";
             members = {
               test = {
                 __functor = _: ctx: ctx.focal * p1;
-                __override = { super-ctx, member, ... }: ctx: super-ctx.test + member ctx;
+                __override = simple-override ({ self, super, ... }: super.test + self.test);
               };
             };
           };
@@ -175,7 +191,7 @@ let
             members = {
               test = {
                 __functor = _: ctx: ctx.focal * p2;
-                __override = { super-ctx, member, ... }: ctx: super-ctx.test + member ctx;
+                __override = simple-override ({ self, super, ... }: super.test + self.test);
               };
             };
           };
