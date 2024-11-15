@@ -2,10 +2,22 @@
 let
   inherit (prim) pretty-print;
   lib = nixpkgs.lib;
+
+  type-variants = {
+    base-type = 0;
+    user-type = 1;
+    trait = 2;
+  };
+
   base-type-ctx = { name }: context {
     name = name;
     __functor = _: arg: context (arg // { name = "${name}-instance"; });
     members = {
+
+      type-variant = {
+        __description = "Indicate that these are base (builtin) types";
+        __functor = _: _: type-variants.base-type;
+      };
 
       instance-context = {
         __description = "The context which surrounds all instances of the type";
@@ -142,15 +154,15 @@ let
         ;
       in
       {
-        __functor = _: ctx: spec.type spec ctx;
+        __functor = _: ctx: type spec ctx;
       }
     ;
   };
 
-  make-member = {
-    __description = "Convert the spec of a type member into the spec of a context member.";
+  make-any-member = {
+    __description = "Basic conversion of a typed member into a context member.";
 
-    __functor = _: spec:
+    __functor = _: name: spec:
       let 
         type =
           if builtins.hasAttr "type" spec
@@ -159,8 +171,44 @@ let
         ;
       in
       {
-        __functor = _: ctx: spec.type (spec ctx);
+        __type = type;
+        __functor = _: ctx: type (spec ctx);
       }
+    ;
+  };
+
+  make-type-member = {
+    __description = ''
+      Convert the spec of a user type member into a context member. Below are details
+      of all the considerations that are used for this step.
+
+      # Overriding
+
+      These are the rules that govern how members of a type can be overriden.
+
+      ## Traits
+      When a type instance is extended with a trait, the abstract members of the
+      trait will be masked with the implementation of existing members of the
+      instance. If the type of the trait member doesn't match the type of the
+      instance member, overriding will fail.
+    '';
+
+    __functor = _: name: spec:
+      let
+        base-member = make-any-member name spec;
+        override-trait = { current-member, final-ctx, ... }:
+          # Todo: check the type
+          current-member final-ctx
+        ;
+        __override = { extension, ...}@args:
+          if builtins.hasAttr "__trait" extension.focal
+          then override-trait args
+          else throw "The member ${name} cannot be overriden"
+        ; 
+      in
+        base-member // {
+          inherit __override;
+        }
     ;
   };
 
@@ -176,7 +224,7 @@ let
         __functor = _: ctx:
           let
             spec = ctx.focal;
-            members = builtins.mapAttrs (_: v: make-member v) spec.members;
+            members = builtins.mapAttrs make-type-member spec.members;
             ctor-attrs = {
               __functor = _: make-ctor (spec.__functor);
             };
@@ -200,6 +248,69 @@ let
         __functor = _: ctx: _: ctx.instance-context;
       };
     };
+  };
+
+  make-trait-member = {
+    __description = ''
+      Convert a trait member spec into the member that will be used by the resulting
+      context. This includes:
+       - adding the appropiate overriding semantics
+       - raising errors if an abstract member is called
+       - prevent further overriding
+    '';
+
+    __functor = _: name: { ... }@spec:
+      let
+        __functor =
+          if builtins.hasAttr "__functor" spec
+          then spec.__functor
+          else _: throw "The trait member '${name}' is abstract and has not been overriden."
+        ;
+        __override = _: "The member '${name}' is a trait member and cannot be overriden.";
+      in  
+        make-any-member (spec // { inherit __functor; })
+        // { inherit __override; }
+    ;
+  };
+
+  Trait = context {
+    name = "Trait";
+
+    __functor = { name, members, ... }@spec: spec;
+
+    members = {
+      
+      type-variant = {
+        __description = "Indicate that this type is a trait.";
+        __functor = _: _: type-variants.trait;
+      };
+
+      instance-context = {
+        __description = "The context used to extend values with this trait";
+        __functor = _: ctx:
+          let
+            spec = ctx.focal;
+            members = builtins.mapAttrs (_: v: make-trait-member v) spec.members;
+          in
+            context {
+              name = "${spec.name}-trait-instance";
+              __trait = {
+              };
+              inherit members;
+              __functor = _: _: "The trait instance context '${spec.name}' can only be used to extend contexts.";
+            };
+        ;
+      };
+    };
+  };
+
+  trait = {
+    __description = ''
+      Function that allows defining traits.
+
+      Traits specify an interface that must be supported by a type and provide
+      additional member functions that wrap around said interface.
+    '';
   };
 
   type = {
@@ -284,6 +395,36 @@ let
         in
           _assert.eq ((value.replicate 3) "!!" 1).focal expected.focal
       ;
+
+      "Types can be extended with traits" = { _assert, ... }:
+        let
+          Dummy = type {
+            name = "Dummy";
+
+            members = {
+
+              concat = {
+                type = Arrow { From = Dummy; To = Dummy; };
+                __functor = _: ctx: other: Dummy (ctx.focal + other.focal);
+              };
+            };
+          };
+
+          DummyTrait = trait {
+            name = "DummyTrait";
+
+            members = {
+              concat = {
+                type = Arrow { From = {}; To = {}; };
+              };
+
+              concat-many = {
+
+              };
+            };
+          };
+        in
+          throw "not ready";
     };
   };
 in

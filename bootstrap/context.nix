@@ -47,7 +47,7 @@ let
           builtins.mapAttrs apply-default spec.members
       ;
 
-      apply-overrides = initial: final:
+      apply-overrides = { initial, final, extension }:
         let
           initial-ctx = initial.${tikal-meta.context-uid};
           get-member = key: members-uid:
@@ -65,7 +65,7 @@ let
               prev = prev-members key;
               acc = current-member: new-member:
                 current-member.__override {
-                  inherit key current-member new-member;
+                  inherit extension key current-member new-member;
                   initial-ctx = initial;
                   final-ctx = final;
                 }
@@ -74,11 +74,16 @@ let
               lib.foldr acc member prev
           ;
           apply-override = key: member:
+            # Check if the current context already has a member with the
+            # same name as the new members. In the positive case,
+            # override the member according to its rules for overriding.
             if key != tikal-meta.context-uid && builtins.hasAttr key initial
             then override-member { inherit key member; } final
             else member final
           ;
         in
+          # Map over the members that the new context
+          # provides.
           builtins.mapAttrs apply-override members
       ;
       __functor = self: value:
@@ -88,7 +93,7 @@ let
               prev-inner-ctx = current-ctx.${tikal-meta.context-uid};
               result =
                 current-ctx //
-                (new-ctx.apply-overrides current-ctx result) //
+                (new-ctx.apply-overrides { initial = current-ctx; final = result; extension = new-ctx; }) //
                 {
                   ${tikal-meta.context-uid} = prev-inner-ctx // {
                     contexts = prev-inner-ctx.contexts ++ [ new-ctx.uid ];
