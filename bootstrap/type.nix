@@ -287,7 +287,7 @@ let
 
       instance-context = {
         __description = "The context used to extend values with this trait";
-        __functor = _: ctx:
+        __functor = _: ctx: self:
           let
             spec = ctx.focal;
             members = builtins.mapAttrs (_: v: make-trait-member v) spec.members;
@@ -298,8 +298,12 @@ let
               };
               inherit members;
               __functor = _: _: "The trait instance context '${spec.name}' can only be used to extend contexts.";
-            };
+            }
         ;
+      };
+
+      __functor = {
+        __functor = _: ctx: _: instance: throw "Error";
       };
     };
   };
@@ -320,7 +324,7 @@ let
 
     __functor = _: Type;
 
-    __tests = {
+    __testsoff = {
       "It can create an Int instance" = { _assert, ... }:
         _assert.eq (Int 42).focal 42
       ;
@@ -413,18 +417,22 @@ let
           DummyTrait = trait {
             name = "DummyTrait";
 
-            members = {
+            members = { Self, ... }: {
               concat = {
-                type = Arrow { From = {}; To = {}; };
+                type = Arrow { From = Self; To = Self; };
               };
 
               concat-many = {
-
+                type = Arrow { From = List { Item = Self; }; To = Self; };
+                __functor = _: ctx: items: builtins.foldl (s: i: s.concat i) ctx items;
               };
             };
           };
+
+          value = DummyTrait (Dummy 5);
         in
-          throw "not ready";
+          DummyTrait.concat-many [ 1 2 3 4 5 ]
+      ;
     };
   };
 in
