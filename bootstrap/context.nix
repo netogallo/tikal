@@ -213,56 +213,56 @@ let
         in
           _assert.eq value.test ((3 * p1) + (3 * p2) + (3 * p3))
       ;
-#      "It cannot override protected members" = { _assert, ... }:
-#        let
-#          ctx-1 = context {
-#            name = "bad-ctx";
-#            members = {
-#              focal = {
-#                __functor = _: ctx: "bad";
-#              };
-#            };
-#          };
-#        in
-#          _assert.throws ((ctx-1 3).focal)
-#      ;
-#      "It can transform the focal" = { _assert, ... }:
-#        let
-#          spec = {
-#            name = "transform-focal-ctx";
-#            __functor = _: value: value + 1;
-#            members = {};
-#          };
-#          input = 41;
-#          expected = spec input;
-#          ctx = context spec;
-#        in
-#          _assert ((ctx 41).focal == expected)
-#      ;
-#      "It can have a __funcotr member" = { _assert, ... }:
-#        let
-#          fn-ctx = context {
-#            name = "functor";
-#            members = {
-#              __functor = {
-#                __functor = _: ctx: _: v: ctx.focal v;
-#              };
-#            };
-#          };
-#          fn = x: x*x;
-#        in
-#          _assert.eq (fn-ctx fn 5) (fn 5)
-#      ;
-#      "It can check if a context surronds a value" = { _assert, ... }:
-#        let
-#          ctx = context {
-#            name = "surronds";
-#            members = {};
-#          };
-#          v = ctx 42;
-#        in
-#          _assert (ctx.surrounds v)
-#      ;
+      "It cannot override protected members" = { _assert, ... }:
+        let
+          ctx-1 = context {
+            name = "bad-ctx";
+            members = { ... }: {
+              focal = {
+                __member = _: "bad";
+              };
+            };
+          };
+        in
+          _assert.throws ((ctx-1 3).focal)
+      ;
+      "It can transform the focal" = { _assert, ... }:
+        let
+          spec = {
+            name = "transform-focal-ctx";
+            __functor = _: value: value + 1;
+            members = { ... }: {};
+          };
+          input = 41;
+          expected = spec input;
+          ctx = context spec;
+        in
+          _assert ((ctx 41).focal == expected)
+      ;
+      "It can have a __funcotr member" = { _assert, ... }:
+        let
+          fn-ctx = context {
+            name = "functor";
+            members = { self, ... }: {
+              __functor = {
+                __member = _: _: v: self.focal v;
+              };
+            };
+          };
+          fn = x: x*x;
+        in
+          _assert.eq (fn-ctx fn 5) (fn 5)
+      ;
+      "It can check if a context surronds a value" = { _assert, ... }:
+        let
+          ctx = context {
+            name = "surronds";
+            members = { ... }: {};
+          };
+          v = ctx 42;
+        in
+          _assert (ctx.surrounds v)
+      ;
     };
   };
 in
