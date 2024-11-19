@@ -8,10 +8,10 @@ let
     {
       __member = _:
         let
-          self = final-ctx // { ${key} = new-member.__member {}; };
-          super = initial-ctx // { ${key} = current-member.__member {}; };
+          self-member = new-member.__member {};
+          super-member = current-member.__member {};
         in
-          override { inherit self super; }
+          override { inherit self-member super-member; }
       ;
     }
   ;
@@ -53,8 +53,7 @@ let
           call-ctx = {};
           get-member = key: members-uid:
             let
-              members'' = initial-ctx.${members-uid}.members;
-              members' = builtins.trace "whats my type again? ${builtins.typeOf members''}" members'' { context = initial; };
+              members' = initial-ctx.${members-uid}.members { self = initial; };
             in
               if builtins.hasAttr key members'
               then [ members'.${key} ]
@@ -86,7 +85,7 @@ let
         in
           # Map over the members that the new context
           # provides.
-          builtins.mapAttrs apply-override (members { context = final; })
+          builtins.mapAttrs apply-override (members { self = final; })
       ;
       __functor = self: value:
         let
@@ -162,7 +161,7 @@ let
             members = { self, ... }: {
               test = {
                 __member = _: self.focal + 1;
-                __override = simple-override ({ super, self, ... }: super.test + self.test);
+                __override = simple-override ({ super-member, self-member, ... }: super-member + self-member);
               };
             };
           };
@@ -186,27 +185,27 @@ let
           p3 = 31;
           ctx-1 = context {
             name = "override-1";
-            members = { context, ... }: {
+            members = { self, ... }: {
               test = {
-                __member = _: context.focal * p1;
-                __override = simple-override ({ self, super, ... }: super.test + self.test);
+                __member = _: self.focal * p1;
+                __override = simple-override ({ self-member, super-member, ... }: super-member + self-member);
               };
             };
           };
           ctx-2 = context {
             name = "override-2";
-            members = { context, ... }: {
+            members = { self, ... }: {
               test = {
-                __member = _: context.focal * p2;
-                __override = simple-override ({ self, super, ... }: super.test + self.test);
+                __member = _: self.focal * p2;
+                __override = simple-override ({ self-member, super-member, ... }: super-member + self-member);
               };
             };
           };
           ctx-3 = context {
             name = "override-3";
-            members = {
+            members = { self, ... }: {
               test = {
-                __functor = _: ctx: ctx.focal * p3;
+                __member = _: self.focal * p3;
               };
             };
           };
