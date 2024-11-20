@@ -9,6 +9,24 @@ let
     trait = 2;
   };
 
+  InstanceTrait = trait {
+    name = "InstanceTrait";
+    members = { Self, ... }: {
+
+      __instance-context = {
+        __description = ''
+          A value containing information about a type instance.
+        '';
+
+        type = Any;
+
+        __member = _: {
+          Type = Self;
+        };
+      };
+    };
+  };
+
   base-type-ctx = { name }: context {
     name = name;
     __functor = _: arg: context (arg // { name = "${name}-instance"; });
@@ -34,6 +52,16 @@ let
         __member = _: _: self.focal;
       };
     };
+  };
+
+  Any = {
+
+    __description = ''
+    Used to represent values of any type. This will not wrap the value
+    with a context.
+    '';
+
+    __functor = _: value: value;
   };
 
   Int = base-type-ctx { name = "Int"; } {
@@ -124,6 +152,16 @@ let
               __member = _: self.at;
             };
 
+            foldl = {
+              __description = "Reduce the list from left to right.";
+              __member = { State, ... }: fn: state:
+                let
+                  fn' = Arrow { From = State; To = Arrow { From = Item; To = State;}; } fn;
+                in
+                  builtins.foldl' fn' state self.focal
+              ;
+            };
+
             __functor = {
               __member = _: _: prop: self.${prop};
             };
@@ -196,9 +234,10 @@ let
     __functor = _: name: spec:
       let
         base-member = make-any-member name spec;
-        override-trait = { current-member, ... }:
-          # Todo: check the type
-          current-member
+        override-trait = { current-member, new-member, ... }:
+          if new-member.is-abstract
+          then current-member
+          else "The member ${name} name cannot be overriden."
         ;
         __override = { extension, ...}@args:
           if extension.focal.type-variant == type-variants.trait
@@ -264,7 +303,7 @@ let
             extend-context = { Self = self; };
             acc = state: ctx: state.extend-with-context extend-context ctx.instance-context;
           in
-            builtins.foldl' acc value self.implied-contexts
+            builtins.foldl' acc value ([InstanceTrait] ++ self.implied-contexts)
         ;
       };
 
@@ -295,15 +334,16 @@ let
 
     __functor = _: name: spec:
       let
+        is-abstract = !(builtins.hasAttr "__member" spec);
         __member =
-          if builtins.hasAttr "__member" spec
-          then spec.__member
-          else _: throw "The trait member '${name}' is abstract and has not been overriden."
+          if is-abstract
+          then _: throw "The trait member '${name}' is abstract and has not been overriden."
+          else spec.__member
         ;
         __override = _: "The member '${name}' is a trait member and cannot be overriden.";
         trait-spec = spec // { inherit __member __override; };
       in
-        make-any-member name trait-spec
+        (make-any-member name trait-spec) // { inherit is-abstract; }
     ;
   };
 
@@ -463,7 +503,7 @@ let
 
               concat-many = {
                 type = Arrow { From = List { Item = Self; }; To = Self; };
-                __member = _: items: builtins.foldl' (s: i: s.concat i) self items.focal;
+                __member = _: items: items.foldl { State = Self; } (s: i: s.concat i) self;
               };
             };
           };
