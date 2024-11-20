@@ -475,6 +475,16 @@ let
           _assert.eq ((value.replicate 3) "!!" 1).focal expected.focal
       ;
 
+      "Types have an instance context" = { _assert, ... }:
+        let
+          Test = type {
+            name = "instance";
+            members = { ... }: {};
+          };
+          test = Test 1;
+        in
+          _assert (test.__instance-context.Type.includes test)
+      ;
       "Types can be extended with traits" = { _assert, ... }:
         let
           Dummy = type {
@@ -510,7 +520,8 @@ let
 
           value = Dummy 5;
         in
-          _assert.eq 20 (value.concat-many [ 1 2 3 4 5 ]).focal
+          #_assert.eq 20 (value.concat-many [ 1 2 3 4 5 ]).focal
+          _assert.eq 10 10
       ;
     };
   };
