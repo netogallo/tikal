@@ -196,20 +196,20 @@ let
     __functor = _: name: spec:
       let
         base-member = make-any-member name spec;
-        override-trait = { current-member, final-ctx, ... }:
+        override-trait = { current-member, ... }:
           # Todo: check the type
-          current-member final-ctx
+          current-member
         ;
         __override = { extension, ...}@args:
-          if builtins.hasAttr "__trait" extension.focal
+          if extension.focal.type-variant == type-variants.trait
           then override-trait args
           else throw "The member ${name} cannot be overriden"
         ; 
       in
         base-member
-        #// {
-        #  inherit __override;
-        #}
+        // {
+          inherit __override;
+        }
     ;
   };
 
@@ -240,13 +240,46 @@ let
         ;
       };
 
+      implied-contexts = {
+        __description = ''
+        Contains the list of contexts that are implied by this context. These
+        contexts will be used to extend the instances of this type.
+        '';
+
+        __member = _:
+          if builtins.hasAttr "implies" self.focal
+          then self.focal.implies
+          else []
+        ;
+      };
+
+      extend-with-implied = {
+        __description = ''
+        Extend a context with all the implied contexts asociated with this
+        type.
+        '';
+
+        __member = _: value:
+          let
+            extend-context = { Self = self; };
+            acc = state: ctx: state.extend-with-context extend-context ctx.instance-context;
+          in
+            builtins.foldl' acc value self.implied-contexts
+        ;
+      };
+
       includes = {
         __description = "Check if the given value belongs to this Type";
         __member = _: value: self.instance-context.surrounds value;
       };
 
       __functor = {
-        __member = _: _: self.instance-context;
+        __member = _: _: value:
+          if self.instance-context.surrounds value
+          then value
+          else
+            self.extend-with-implied (self.instance-context value)
+        ;
       };
     };
   };
@@ -260,43 +293,42 @@ let
        - prevent further overriding
     '';
 
-    __functor = _: name: { ... }@spec:
+    __functor = _: name: spec:
       let
-        __functor =
-          if builtins.hasAttr "__functor" spec
-          then spec.__functor
+        __member =
+          if builtins.hasAttr "__member" spec
+          then spec.__member
           else _: throw "The trait member '${name}' is abstract and has not been overriden."
         ;
         __override = _: "The member '${name}' is a trait member and cannot be overriden.";
-      in  
-        make-any-member (spec // { inherit __functor; })
-        // { inherit __override; }
+        trait-spec = spec // { inherit __member __override; };
+      in
+        make-any-member name trait-spec
     ;
   };
 
   Trait = context {
     name = "Trait";
 
-    __functor = { name, members, ... }@spec: spec;
+    __functor = _: { name, members, ... }@spec: spec;
 
-    members = {
+    members = { self, ...}: {
       
       type-variant = {
         __description = "Indicate that this type is a trait.";
-        __functor = _: _: type-variants.trait;
+        __member = _: type-variants.trait;
       };
 
       instance-context = {
         __description = "The context used to extend values with this trait";
-        __functor = _: ctx: self:
+        __member = _:
           let
-            spec = ctx.focal;
-            members = builtins.mapAttrs (_: v: make-trait-member v) spec.members;
+            spec = self.focal;
+            members = ctx: builtins.mapAttrs make-trait-member (spec.members ctx);
           in
             context {
               name = "${spec.name}-trait-instance";
-              __trait = {
-              };
+              type-variant = type-variants.trait;
               inherit members;
               __functor = _: _: "The trait instance context '${spec.name}' can only be used to extend contexts.";
             }
@@ -304,7 +336,7 @@ let
       };
 
       __functor = {
-        __functor = _: ctx: _: instance: throw "Error";
+        __member = _: _: instance: throw "Error";
       };
     };
   };
@@ -316,6 +348,8 @@ let
       Traits specify an interface that must be supported by a type and provide
       additional member functions that wrap around said interface.
     '';
+
+    __functor = _: Trait;
   };
 
   type = {
@@ -400,40 +434,44 @@ let
         in
           _assert.eq ((value.replicate 3) "!!" 1).focal expected.focal
       ;
-#
-#      "Types can be extended with traits" = { _assert, ... }:
-#        let
-#          Dummy = type {
-#            name = "Dummy";
-#
-#            members = {
-#
-#              concat = {
-#                type = Arrow { From = Dummy; To = Dummy; };
-#                __functor = _: ctx: other: Dummy (ctx.focal + other.focal);
-#              };
-#            };
-#          };
-#
-#          DummyTrait = trait {
-#            name = "DummyTrait";
-#
-#            members = { Self, ... }: {
-#              concat = {
-#                type = Arrow { From = Self; To = Self; };
-#              };
-#
-#              concat-many = {
-#                type = Arrow { From = List { Item = Self; }; To = Self; };
-#                __functor = _: ctx: items: builtins.foldl (s: i: s.concat i) ctx items;
-#              };
-#            };
-#          };
-#
-#          value = DummyTrait (Dummy 5);
-#        in
-#          DummyTrait.concat-many [ 1 2 3 4 5 ]
-#      ;
+
+      "Types can be extended with traits" = { _assert, ... }:
+        let
+          Dummy = type {
+            name = "Dummy";
+
+            members = { self, ... }: {
+
+              concat = {
+                type = Arrow { From = Dummy; To = Dummy; };
+                __member = _: other: self.focal + other.focal;
+              };
+            };
+
+            implies = [
+              DummyTrait
+            ];
+          };
+
+          DummyTrait = trait {
+            name = "DummyTrait";
+
+            members = { self, Self, ... }: {
+              concat = {
+                type = Arrow { From = Self; To = Self; };
+              };
+
+              concat-many = {
+                type = Arrow { From = List { Item = Self; }; To = Self; };
+                __member = _: items: builtins.foldl' (s: i: s.concat i) self items.focal;
+              };
+            };
+          };
+
+          value = Dummy 5;
+        in
+          _assert.eq 20 (value.concat-many [ 1 2 3 4 5 ]).focal
+      ;
     };
   };
 in

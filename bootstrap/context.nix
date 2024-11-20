@@ -47,13 +47,15 @@ let
           builtins.mapAttrs apply-default (spec.members ctx)
       ;
 
-      apply-overrides = { initial, final, extension }:
+      apply-overrides = { initial, final, extension, extension-context }:
         let
           initial-ctx = initial.${tikal-meta.context-uid};
           call-ctx = {};
+          initial-members-context = { self = initial; };
+          final-members-context = { self = final; } // extension-context;
           get-member = key: members-uid:
             let
-              members' = initial-ctx.${members-uid}.members { self = initial; };
+              members' = initial-ctx.${members-uid}.members initial-members-context;
             in
               if builtins.hasAttr key members'
               then [ members'.${key} ]
@@ -85,22 +87,28 @@ let
         in
           # Map over the members that the new context
           # provides.
-          builtins.mapAttrs apply-override (members { self = final; })
+          builtins.mapAttrs apply-override (members final-members-context)
       ;
       __functor = self: value:
         let
-          extend = current-ctx: new-ctx:
+          extend-with-context = extension-context: current-ctx: new-ctx:
             let
               prev-inner-ctx = current-ctx.${tikal-meta.context-uid};
               result =
                 current-ctx //
-                (new-ctx.apply-overrides { initial = current-ctx; final = result; extension = new-ctx; }) //
+                (new-ctx.apply-overrides {
+                  inherit extension-context;
+                  initial = current-ctx;
+                  final = result;
+                  extension = new-ctx;
+                }) //
                 {
                   ${tikal-meta.context-uid} = prev-inner-ctx // {
                     contexts = prev-inner-ctx.contexts ++ [ new-ctx.uid ];
                     ${new-ctx.uid} = new-ctx;
                   };
-                  extend = extend result;
+                  extend = extend-with-context {} result;
+                  extend-with-context = ext-ctx: extend-with-context ext-ctx result;
                 }
               ;
             in
@@ -124,9 +132,17 @@ let
               then spec value
               else value
             ;
-            extend = extend ctx;
+            extend = extend-with-context {} ctx;
+            extend-with-context = ext-ctx: extend-with-context ext-ctx ctx;
           };
-          ctx = base-ctx // apply-overrides { initial = base-ctx; final = ctx; extension = null; };
+          ctx =
+            base-ctx
+            // apply-overrides {
+              initial = base-ctx;
+              final = ctx;
+              extension = null;
+              extension-context = {};
+            };
         in
           ctx
       ;
