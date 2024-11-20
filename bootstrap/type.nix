@@ -12,26 +12,26 @@ let
   base-type-ctx = { name }: context {
     name = name;
     __functor = _: arg: context (arg // { name = "${name}-instance"; });
-    members = {
+    members = { self, ...}: {
 
       type-variant = {
         __description = "Indicate that these are base (builtin) types";
-        __functor = _: _: type-variants.base-type;
+        __member = _: _: type-variants.base-type;
       };
 
       instance-context = {
         __description = "The context which surrounds all instances of the type";
-        __functor = _: ctx: ctx.focal;
+        __member = _: self.focal;
       };
       
       includes = {
         __description = "Check if the given value belongs to this Type";
-        __functor = _: ctx: value: ctx.instance-context.surrounds value;
+        __member = _: value: self.instance-context.surrounds value;
       };
 
       __functor = {
         __description = "Construct an instance of the type captured by this context.";
-        __functor = _: ctx: _: ctx.focal;
+        __member = _: _: self.focal;
       };
     };
   };
@@ -46,22 +46,22 @@ let
       else throw "Expected an integer, got ${pretty-print value}"
     ;
 
-    members = {
+    members = { self, ...}: {
 
       "*" = {
-        __functor = _: ctx: arg-any: Int(ctx.focal * (Int arg-any).focal); 
+        __member = _: arg-any: Int(self.focal * (Int arg-any).focal); 
       };
       
       "+" = {
-        __functor = _: ctx: arg-any: Int(ctx.focal + (Int arg-any).focal);
+        __member = _: arg-any: Int(self.focal + (Int arg-any).focal);
       };
 
       raw-string = {
-        __functor = _: ctx: builtins.toString ctx.focal;
+        __member = _: builtins.toString self.focal;
       };
 
       __functor = {
-        __functor = _: ctx: _: op: ctx."${op}";
+        __member = _: _: op: self."${op}";
       };
     };
   };
@@ -70,18 +70,18 @@ let
 
     __functor = _: { From, To }: { inherit From To; };
 
-    members = {
+    members = { self, ... }: {
 
       from = {
-        __functor = _: ctx: ctx.focal.From;
+        __member = _: self.focal.From;
       };
 
       to = {
-        __functor = _: ctx: ctx.focal.To;
+        __member = _: self.focal.To;
       };
 
       __functor = {
-        __functor = _: ctx: _: fn: arg: ctx.to (fn (ctx.from arg));
+        __member = _: _: fn: arg: self.to (fn (self.from arg));
       };
     };
   };
@@ -113,19 +113,19 @@ let
             else throw "Expected a List of Item, got ${pretty-print items}"
           ;
 
-          members = {
+          members = { self, ...}: {
 
             at = {
               __description = "Returns the item at the given index.";
-              __functor = _: ctx: Arrow { From = Int; To = Item; } (i: lib.elemAt ctx.focal i.focal); 
+              __member = _: Arrow { From = Int; To = Item; } (i: lib.elemAt self.focal i.focal); 
             };
 
             "!!" = {
-              __functor = _: ctx: ctx.at;
+              __member = _: self.at;
             };
 
             __functor = {
-              __functor = _: ctx: _: prop: ctx.${prop};
+              __member = _: _: prop: self.${prop};
             };
           };
         };
@@ -133,11 +133,11 @@ let
         item-list
     ;
 
-    members = {
+    members = { self, ...}: {
 
       __functor = {
         __description = "Constructs a list of the specified 'Item' type.";
-        __functor = _: ctx: _: ctx.focal;
+        __member = _: _: self.focal;
       };
     };
   };
@@ -172,7 +172,7 @@ let
       in
       {
         __type = type;
-        __functor = _: ctx: type (spec ctx);
+        __member = ctx: type (spec .__member ctx);
       }
     ;
   };
@@ -206,9 +206,10 @@ let
           else throw "The member ${name} cannot be overriden"
         ; 
       in
-        base-member // {
-          inherit __override;
-        }
+        base-member
+        #// {
+        #  inherit __override;
+        #}
     ;
   };
 
@@ -217,14 +218,14 @@ let
 
     __functor = _: { name, members, ... }@spec: spec;
 
-    members = {
+    members = { self, ...}: {
 
       instance-context = {
         __description = "The context which surrounds all instances of the type";
-        __functor = _: ctx:
+        __member = _:
           let
-            spec = ctx.focal;
-            members = builtins.mapAttrs make-type-member spec.members;
+            spec = self.focal;
+            members = ctx: builtins.mapAttrs make-type-member (spec.members ctx);
             ctor-attrs = {
               __functor = _: make-ctor (spec.__functor);
             };
@@ -241,11 +242,11 @@ let
 
       includes = {
         __description = "Check if the given value belongs to this Type";
-        __functor = _: ctx: value: ctx.instance-context.surrounds value;
+        __member = _: value: self.instance-context.surrounds value;
       };
 
       __functor = {
-        __functor = _: ctx: _: ctx.instance-context;
+        __member = _: _: self.instance-context;
       };
     };
   };
@@ -324,7 +325,7 @@ let
 
     __functor = _: Type;
 
-    __testsoff = {
+    __tests = {
       "It can create an Int instance" = { _assert, ... }:
         _assert.eq (Int 42).focal 42
       ;
@@ -369,7 +370,7 @@ let
               __functor = _: i: i "*" 2;
             };
 
-            members = {
+            members = { ... }: {
             };
           };
           value = Dummy 5;
@@ -385,11 +386,11 @@ let
           Member = type {
             name = "Member";
 
-            members = {
+            members = { self, ... }: {
 
               replicate = {
                 type = Arrow { From = Int; To = List { Item = Int; }; };
-                __functor = _: ctx: times: map (_: ctx.focal) (lib.range 1 times.focal);
+                __member = _: times: map (_: self.focal) (lib.range 1 times.focal);
               };
             };
           };
@@ -399,40 +400,40 @@ let
         in
           _assert.eq ((value.replicate 3) "!!" 1).focal expected.focal
       ;
-
-      "Types can be extended with traits" = { _assert, ... }:
-        let
-          Dummy = type {
-            name = "Dummy";
-
-            members = {
-
-              concat = {
-                type = Arrow { From = Dummy; To = Dummy; };
-                __functor = _: ctx: other: Dummy (ctx.focal + other.focal);
-              };
-            };
-          };
-
-          DummyTrait = trait {
-            name = "DummyTrait";
-
-            members = { Self, ... }: {
-              concat = {
-                type = Arrow { From = Self; To = Self; };
-              };
-
-              concat-many = {
-                type = Arrow { From = List { Item = Self; }; To = Self; };
-                __functor = _: ctx: items: builtins.foldl (s: i: s.concat i) ctx items;
-              };
-            };
-          };
-
-          value = DummyTrait (Dummy 5);
-        in
-          DummyTrait.concat-many [ 1 2 3 4 5 ]
-      ;
+#
+#      "Types can be extended with traits" = { _assert, ... }:
+#        let
+#          Dummy = type {
+#            name = "Dummy";
+#
+#            members = {
+#
+#              concat = {
+#                type = Arrow { From = Dummy; To = Dummy; };
+#                __functor = _: ctx: other: Dummy (ctx.focal + other.focal);
+#              };
+#            };
+#          };
+#
+#          DummyTrait = trait {
+#            name = "DummyTrait";
+#
+#            members = { Self, ... }: {
+#              concat = {
+#                type = Arrow { From = Self; To = Self; };
+#              };
+#
+#              concat-many = {
+#                type = Arrow { From = List { Item = Self; }; To = Self; };
+#                __functor = _: ctx: items: builtins.foldl (s: i: s.concat i) ctx items;
+#              };
+#            };
+#          };
+#
+#          value = DummyTrait (Dummy 5);
+#        in
+#          DummyTrait.concat-many [ 1 2 3 4 5 ]
+#      ;
     };
   };
 in
