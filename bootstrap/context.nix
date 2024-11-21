@@ -51,7 +51,7 @@ let
         let
           initial-ctx = initial.${tikal-meta.context-uid};
           call-ctx = {};
-          initial-members-context = { self = initial; };
+          initial-members-context = { self = initial; } // extension-context;
           final-members-context = { self = final; } // extension-context;
           get-member = key: members-uid:
             let

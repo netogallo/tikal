@@ -2,6 +2,7 @@
 let
   inherit (prim) pretty-print;
   lib = nixpkgs.lib;
+  stdenv = nixpkgs.stdenv;
 
   type-variants = {
     base-type = 0;
@@ -52,6 +53,31 @@ let
         __member = _: _: self.focal;
       };
     };
+  };
+
+
+  check-instance-value = {
+
+    __description = ''
+    This function applies some strict checks to instance values of user generated
+    types. Given that nix is lazy, it is possible that errors in the definition of
+    a type do not get caught unitl instance values are used in a particular way.
+    This function moves some of this errors to the moment a type instance is created
+    by creting a dummy derivation that applies checks during its construction.
+
+    Checks performed:
+    - Check that member overriding rules are respected.
+    '';
+
+    __functor = _: instance:
+      let
+        out-str = builtins.toJSON (builtins.mapAttrs (_: builtins.typeOf) instance);
+        key = builtins.hashString "sha256" out-str;
+        dummy = { ${key} = instance; };
+        check-drv = nixpkgs.writeText key out-str;
+      in
+        dummy."${check-drv.name}"
+    ;
   };
 
   Any = {
@@ -154,7 +180,7 @@ let
 
             foldl = {
               __description = "Reduce the list from left to right.";
-              __member = { State, ... }: fn: state:
+              __member = _: { State }: fn: state:
                 let
                   fn' = Arrow { From = State; To = Arrow { From = Item; To = State;}; } fn;
                 in
@@ -237,7 +263,7 @@ let
         override-trait = { current-member, new-member, ... }:
           if new-member.is-abstract
           then current-member
-          else "The member ${name} name cannot be overriden."
+          else throw "The member ${name} name cannot be overriden."
         ;
         __override = { extension, ...}@args:
           if extension.focal.type-variant == type-variants.trait
@@ -274,7 +300,11 @@ let
               name = "${spec.name}-instance";
               inherit members;
             } //
-            (if builtins.hasAttr "__functor" spec then ctor-attrs else {})
+            (
+              if builtins.hasAttr "__functor" spec
+              then ctor-attrs
+              else {}
+            )
           )
         ;
       };
@@ -303,7 +333,7 @@ let
             extend-context = { Self = self; };
             acc = state: ctx: state.extend-with-context extend-context ctx.instance-context;
           in
-            builtins.foldl' acc value ([InstanceTrait] ++ self.implied-contexts)
+            lib.foldl' acc value ([InstanceTrait] ++ self.implied-contexts)
         ;
       };
 
@@ -317,7 +347,7 @@ let
           if self.instance-context.surrounds value
           then value
           else
-            self.extend-with-implied (self.instance-context value)
+            check-instance-value (self.extend-with-implied (self.instance-context value))
         ;
       };
     };
@@ -485,6 +515,25 @@ let
         in
           _assert (test.__instance-context.Type.includes test)
       ;
+
+      "Traits cannot override concrete members" = { _assert, ... }:
+        let
+          Dodgey = type {
+            name = "Dodgey";
+
+            members = { self, ... }: {
+
+              __instance-context = {
+                type = Any;
+
+                __member = _: "";
+              };
+            };
+          };
+        in
+          _assert.throws (Dodgey 5)
+      ;
+
       "Types can be extended with traits" = { _assert, ... }:
         let
           Dummy = type {
@@ -520,8 +569,7 @@ let
 
           value = Dummy 5;
         in
-          #_assert.eq 20 (value.concat-many [ 1 2 3 4 5 ]).focal
-          _assert.eq 10 10
+          _assert.eq 20 (value.concat-many [ 1 2 3 4 5 ]).focal
       ;
     };
   };
