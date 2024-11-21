@@ -113,13 +113,16 @@ let
         then "{ ... }"
         else if builtins.typeOf v == "list"
         then "[ ... ]"
+        else if builtins.typeOf v == "string"
+        then v
         else builtins.toString v
       ;
+      render-item = k: builtins.trace "rendering ${k}" (render (builtins.getAttr k value));
       set-items =
         builtins.concatStringsSep
         ", "
-        (map (k: "${k} = ${render (builtins.getAttr k value)}")
-        (attrNames value));
+        (map render-item (attrNames value))
+      ;
       set-str = "{${set-items}}";
       list-str = "[${builtins.concatStringsSep ", " (map render value)}]";
     in
