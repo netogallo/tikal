@@ -429,7 +429,7 @@ let
 
     __functor = _: Type;
 
-    __tests = {
+    ___tests = {
       "It can create an Int instance" = { _assert, ... }:
         _assert.eq (Int 42).focal 42
       ;

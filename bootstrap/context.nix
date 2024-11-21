@@ -4,17 +4,21 @@ let
   lib = nixpkgs.lib;
   base-ctx-uid = "${tikal-meta.context-uid}-base";
 
-  simple-override = override: { key, initial-ctx, final-ctx, current-member, new-member, ... }:
-    {
-      __member = _:
-        let
-          self-member = new-member.__member {};
-          super-member = current-member.__member {};
-        in
-          override { inherit self-member super-member; }
-      ;
-    }
-  ;
+  trivial = {
+    override = override: { key, initial-ctx, final-ctx, current-member, new-member, ... }:
+      {
+        __member = _:
+          let
+            self-member = new-member.__member {};
+            super-member = current-member.__member {};
+          in
+            override { inherit self-member super-member; }
+        ;
+      }
+    ;
+
+    constructor = fn: _: { constructor, ... }: value: constructor (fn value);
+  };
 
   member-defaults = { fullname }: {
     __override = _: throw "The member '${fullname}' does not allow overriding.";
@@ -89,62 +93,76 @@ let
           # provides.
           builtins.mapAttrs apply-override (members final-members-context)
       ;
-      __functor = self: value:
+      __functor = self:
         let
-          extend-with-context = extension-context: current-ctx: new-ctx:
+          constructor = focal:
             let
-              prev-inner-ctx = current-ctx.${tikal-meta.context-uid};
-              result =
-                current-ctx //
-                (new-ctx.apply-overrides {
-                  inherit extension-context;
-                  initial = current-ctx;
-                  final = result;
-                  extension = new-ctx;
-                }) //
-                {
-                  ${tikal-meta.context-uid} = prev-inner-ctx // {
-                    contexts = prev-inner-ctx.contexts ++ [ new-ctx.uid ];
-                    ${new-ctx.uid} = new-ctx;
-                  };
-                  extend = extend-with-context {} result;
-                  extend-with-context = ext-ctx: extend-with-context ext-ctx result;
-                }
+              extend-with-context = extension-context: current-ctx: new-ctx:
+                let
+                  prev-inner-ctx = current-ctx.${tikal-meta.context-uid};
+                  result =
+                    current-ctx //
+                    (new-ctx.apply-overrides {
+                      inherit extension-context;
+                      initial = current-ctx;
+                      final = result;
+                      extension = new-ctx;
+                    }) //
+                    {
+                      ${tikal-meta.context-uid} = prev-inner-ctx // {
+                        contexts = prev-inner-ctx.contexts ++ [ new-ctx.uid ];
+                        ${new-ctx.uid} = new-ctx;
+                      };
+                      extend = extend-with-context {} result;
+                      extend-with-context = ext-ctx: extend-with-context ext-ctx result;
+                    }
+                  ;
+                in
+                  result
               ;
-            in
-              result
-          ;
-          base-ctx = {
-            ${tikal-meta.context-uid} = {
-              contexts = [ base-ctx-uid self.uid ];
-              ${self.uid} = self;
-              ${base-ctx-uid} = {
-                name = "base";
-                members = _: {
-                  focal = member-defaults { fullname = "${self.fullname}.focal"; };
-                  extend = member-defaults { fullname = "${self.fullname}.extend"; };
+              base-ctx = {
+                inherit focal;
+                ${tikal-meta.context-uid} = {
+                  contexts = [ base-ctx-uid self.uid ];
+                  ${self.uid} = self;
+                  ${base-ctx-uid} = {
+                    name = "base";
+                    members = _: {
+                      focal = member-defaults { fullname = "${self.fullname}.focal"; };
+                      extend = member-defaults { fullname = "${self.fullname}.extend"; };
+                    };
+                  };
                 };
-              };
-            };
 
-            focal =
-              if builtins.hasAttr "__functor" spec
-              then spec value
-              else value
-            ;
-            extend = extend-with-context {} ctx;
-            extend-with-context = ext-ctx: extend-with-context ext-ctx ctx;
-          };
-          ctx =
-            base-ctx
-            // apply-overrides {
-              initial = base-ctx;
-              final = ctx;
-              extension = null;
-              extension-context = {};
-            };
+                #focal = value
+                  #if builtins.hasAttr "__functor" spec
+                  #then spec value
+                  #else value
+                #;
+                extend = extend-with-context {} ctx;
+                extend-with-context = ext-ctx: extend-with-context ext-ctx ctx;
+              };
+              ctx =
+                base-ctx
+                // apply-overrides {
+                  initial = base-ctx;
+                  final = ctx;
+                  extension = null;
+                  extension-context = {};
+                };
+            in
+              ctx
+          ;
+          default-constructor = { constructor, ... }: value:
+            constructor value
+          ;
+          selected-constructor =
+            if builtins.hasAttr "__functor" spec
+            then spec
+            else default-constructor
+          ;
         in
-          ctx
+          selected-constructor { inherit constructor; }
       ;
     };
 
@@ -177,7 +195,7 @@ let
             members = { self, ... }: {
               test = {
                 __member = _: self.focal + 1;
-                __override = simple-override ({ super-member, self-member, ... }: super-member + self-member);
+                __override = trivial.override ({ super-member, self-member, ... }: super-member + self-member);
               };
             };
           };
@@ -204,7 +222,7 @@ let
             members = { self, ... }: {
               test = {
                 __member = _: self.focal * p1;
-                __override = simple-override ({ self-member, super-member, ... }: super-member + self-member);
+                __override = trivial.override ({ self-member, super-member, ... }: super-member + self-member);
               };
             };
           };
@@ -213,7 +231,7 @@ let
             members = { self, ... }: {
               test = {
                 __member = _: self.focal * p2;
-                __override = simple-override ({ self-member, super-member, ... }: super-member + self-member);
+                __override = trivial.override ({ self-member, super-member, ... }: super-member + self-member);
               };
             };
           };
@@ -246,16 +264,16 @@ let
         let
           spec = {
             name = "transform-focal-ctx";
-            __functor = _: value: value + 1;
+            __functor = trivial.constructor (value: value + 1);
             members = { ... }: {};
           };
           input = 41;
-          expected = spec input;
+          expected = 42;
           ctx = context spec;
         in
-          _assert ((ctx 41).focal == expected)
+          _assert.eq (ctx input).focal expected
       ;
-      "It can have a __funcotr member" = { _assert, ... }:
+      "It can have a __functor member" = { _assert, ... }:
         let
           fn-ctx = context {
             name = "functor";
