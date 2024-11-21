@@ -1,8 +1,9 @@
-{ nixpkgs, tikal-meta, prim, ... }: { module-meta, context, test, pretty-print, ... }:
+{ nixpkgs, tikal-meta, prim, callPackage, ... }: { module-meta, context, trivial, test, pretty-print, ... }:
 let
   inherit (prim) pretty-print;
   lib = nixpkgs.lib;
   stdenv = nixpkgs.stdenv;
+  prim = callPackage ./lib.nix {};
 
   type-variants = {
     base-type = 0;
@@ -30,7 +31,7 @@ let
 
   base-type-ctx = { name }: context {
     name = name;
-    __functor = _: arg: context (arg // { name = "${name}-instance"; });
+    __functor = trivial.constructor (arg: context (arg // { name = "${name}-instance"; }));
     members = { self, ...}: {
 
       type-variant = {
@@ -51,6 +52,11 @@ let
       __functor = {
         __description = "Construct an instance of the type captured by this context.";
         __member = _: _: self.focal;
+      };
+
+      generic-type = {
+        __description = "This should not be used for generic types";
+        __member = _: null;
       };
     };
   };
@@ -90,14 +96,35 @@ let
     __functor = _: value: value;
   };
 
+  Bool = base-type-ctx { name = "Bool"; } {
+    
+    __functor = trivial.constructor (
+      value:
+        if builtins.typeOf value == "bool"
+        then value
+        else if Bool.includes value
+        then value.focal
+        else throw "Expected a boolean, got ${pretty-print value}"
+    );
+
+    members = { self, ... }: {
+
+      to-nix = {
+        __member = _: self.focal;
+      };
+    };
+  };
+
   Int = base-type-ctx { name = "Int"; } {
 
-    __functor = _: value:
-      if builtins.typeOf value == "int"
-      then value
-      else if Int.includes value
-      then value.focal
-      else throw "Expected an integer, got ${pretty-print value}"
+    __functor = trivial.constructor (
+      value:
+        if builtins.typeOf value == "int"
+        then value
+        else if Int.includes value
+        then value.focal
+        else throw "Expected an integer, got ${pretty-print value}"
+      )
     ;
 
     members = { self, ...}: {
@@ -114,6 +141,10 @@ let
         __member = _: builtins.toString self.focal;
       };
 
+      to-nix = {
+        __member = _: self.focal;
+      };
+
       __functor = {
         __member = _: _: op: self."${op}";
       };
@@ -122,7 +153,7 @@ let
 
   Arrow = base-type-ctx { name = "Arrow"; } {
 
-    __functor = _: { From, To }: { inherit From To; };
+    __functor = trivial.constructor ({ From, To }: { inherit From To; });
 
     members = { self, ... }: {
 
@@ -142,30 +173,36 @@ let
 
   String = base-type-ctx { name = "String"; } {
 
-    __functor = _: str:
-      if builtins.typeOf str == "string"
-      then str
-      else if String.includes str
-      then str.focal
-      else throw "Expected a string, got ${pretty-print str}"
-    ;
+    __functor = trivial.constructor (
+      str:
+        if builtins.typeOf str == "string"
+        then str
+        else if String.includes str
+        then str.focal
+        else throw "Expected a string, got ${pretty-print str}"
+    );
 
-    members = {
+    members = { self, ... }: {
+
+      to-nix = {
+        __member = _: self.focal;
+      };
     };
   };
 
   List = base-type-ctx { name = "List$1"; } {
 
-    __functor = _: { Item }:
+    __functor = _: { constructor, ... }: { Item }:
       let
         item-list = base-type-ctx { name = "List$Item"; } {
-          __functor = _: items:
-            if builtins.typeOf items == "list"
-            then map Item items
-            else if item-list.includes items
-            then item-list.focal
-            else throw "Expected a List of Item, got ${pretty-print items}"
-          ;
+          __functor = trivial.constructor(
+            items:
+              if builtins.typeOf items == "list"
+              then map Item items
+              else if item-list.includes items
+              then item-list.focal
+              else throw "Expected a List of Item, got ${pretty-print items}"
+          );
 
           members = { self, ...}: {
 
@@ -194,7 +231,7 @@ let
           };
         };
       in
-        item-list
+        constructor item-list
     ;
 
     members = { self, ...}: {
@@ -209,7 +246,7 @@ let
   make-ctor = {
     __description = "Convert the spec of a type constructor into the spec of a context constructor.";
 
-    __functor = _: spec:
+    __functor = _: spec: ctx:
       let
         type =
           if builtins.hasAttr "type" spec
@@ -217,9 +254,7 @@ let
           else throw "Member function definitions must have a 'type' attribute."
         ;
       in
-      {
-        __functor = _: ctx: type spec ctx;
-      }
+      type spec.__member ctx
     ;
   };
 
@@ -233,11 +268,20 @@ let
           then spec.type
           else throw "Member function definitions must have a 'type' attribute."
         ;
+        type-args = prim.getAttrDeep "type-args" spec;
+        is-generic = type-args != null;
+        member = {
+          __type = type;
+          __member = ctx: type (spec.__member ctx);
+        };
+        generic-member = {
+          __type = type;
+          __member = ctx: targs: type targs (spec.__member (ctx // targs));
+        };
       in
-      {
-        __type = type;
-        __member = ctx: type (spec .__member ctx);
-      }
+        if is-generic
+        then generic-member
+        else member
     ;
   };
 
@@ -278,12 +322,42 @@ let
     ;
   };
 
+  get-ctor-spec =
+    prim.getAttrDeepPoly {
+      strict = true;
+      validate = { result, ... }: builtins.typeOf result == "lambda"; 
+      error = { obj, ... }: ''
+      The spec:
+
+      ${pretty-print obj}
+
+      does not have a 'new' property. Type definitions must have a 'new'
+      property. This property must be a lambda that takes as argument
+      the constructor context and produces a constructor spec.
+      '';
+    } "new"
+  ;
+
+  spec-defaults = {
+    generic-type = null;
+  };
+
   Type = context {
     name = "Type";
 
-    __functor = _: { name, members, ... }@spec: spec;
+    __functor = trivial.constructor ({ name, members, ... }@spec: spec-defaults // spec);
 
     members = { self, ...}: {
+
+      type-fullname = {
+        __description = "The full name of the type";
+        __member = _: self.focal.name;
+      };
+
+      generic-type = {
+        __description = "The generic type (if any) from which this type is derived";
+        __member = _: self.focal.generic-type;
+      };
 
       instance-context = {
         __description = "The context which surrounds all instances of the type";
@@ -291,21 +365,16 @@ let
           let
             spec = self.focal;
             members = ctx: builtins.mapAttrs make-type-member (spec.members ctx);
+            ctor-spec = get-ctor-spec spec {}; 
             ctor-attrs = {
-              __functor = _: make-ctor (spec.__functor);
+              __functor = trivial.constructor (make-ctor ctor-spec);
             };
           in
-          context (
-            {
-              name = "${spec.name}-instance";
-              inherit members;
-            } //
-            (
-              if builtins.hasAttr "__functor" spec
-              then ctor-attrs
-              else {}
-            )
-          )
+          context {
+            name = "${spec.name}-instance";
+            inherit members;
+            __functor = trivial.constructor (make-ctor ctor-spec);
+          }
         ;
       };
 
@@ -342,9 +411,35 @@ let
         __member = _: value: self.instance-context.surrounds value;
       };
 
+      __tests = {
+        __description = "The tests for this type that are defined in the spec";
+        __member = _:
+          if builtins.hasAttr "__tests" self.focal
+          then self.focal.__tests
+          else {}
+        ;
+      };
+
       __functor = {
         __member = _: _: value:
-          if self.instance-context.surrounds value
+          let
+            spec = self.focal;
+            type-args = prim.getAttrDeepPoly { default = {}; } "type-args" spec;
+            is-generic = type-args != {};
+            targs-ctx = value // { type-args = value; };
+            spec-instance =
+              spec
+              // {
+                generic-type = self;
+                type-args = {};
+                new = args: spec.new (args // targs-ctx);
+                members = args: spec.members (args // targs-ctx);
+              }
+            ;
+          in
+          if is-generic
+          then Type spec-instance 
+          else if self.instance-context.surrounds value
           then value
           else
             check-instance-value (self.extend-with-implied (self.instance-context value))
@@ -380,7 +475,7 @@ let
   Trait = context {
     name = "Trait";
 
-    __functor = _: { name, members, ... }@spec: spec;
+    __functor = trivial.constructor({ name, members, ... }@spec: spec);
 
     members = { self, ...}: {
       
@@ -422,7 +517,177 @@ let
     __functor = _: Trait;
   };
 
-  type = {
+  kind = {
+    any = 0;
+  };
+
+  Set = type {
+
+    name = "Set";
+
+    type-args = { "*" = kind.any; };
+
+    new = { type-args, ... }: {
+      type = Arrow { From = Any; To = Any; };
+      __member = arg:
+        let
+          field-mapper = key: t:
+            let
+              allow-empty = t.generic-type != null && t.generic-type.type-fullname == Maybe.type-fullname;
+            in {
+              value = 
+                if builtins.hasAttr key arg
+                then t arg."${key}"
+                else t null
+              ;
+              valid =
+                if builtins.hasAttr key arg || allow-empty
+                then true
+                else throw ''The set "${pretty-print arg}" is missing the key "${key}"''
+              ;
+            }
+          ;
+          value-with-validation = builtins.mapAttrs field-mapper type-args;
+          validate = lib.all (x: x) (lib.mapAttrsFlatten (_: v: v.valid) value-with-validation);
+        in
+          if validate
+          then builtins.mapAttrs (_: v: v.value) value-with-validation
+          else throw ''The value "${pretty-print arg}" does not match the Set type.''
+      ;
+    };
+
+    members = { self, type-args, ... }:
+      let
+        create-member-fields = name:
+          let
+            field-type = type-args."${name}";
+            field-members = {
+              ${name} = {
+                type = field-type;
+                __member = _: self.focal."${name}";
+              };
+            };
+            field-members-names = builtins.attrNames field-members;
+            valid = builtins.all field-is-allowed field-members-names;
+          in
+            if valid
+            then field-members
+            else throw "Set cannot use a reserved field"
+        ;
+        member-fields-acc = s: name: s // create-member-fields name;
+        member-fields =
+          lib.foldl
+          member-fields-acc
+          {}
+          (builtins.attrNames type-args)
+        ; 
+        set-members = {};
+        set-reserved-members = builtins.attrNames set-members;
+        field-is-allowed = field:
+          if builtins.all (f: f != field) set-reserved-members
+          then true
+          else throw "The field name '${field}' is reserved and cannot be used as a 'Set' field."
+        ;
+      in
+        member-fields
+        // set-members
+    ;
+
+    __tests = {
+      "A typed set can be defined and used." = { _assert, ... }:
+        let
+          MySet = Set { Test = Int; Other = String; };
+          test = MySet { Test = 5; Other = "5"; };
+        in
+          _assert.all [
+            (_assert.eq test.Test.to-nix 5)
+            (_assert.eq test.Other.to-nix "5")
+          ]
+      ;
+
+      "A typed set checks that all attributes are present" = { _assert, ... }:
+        let
+          MySet = Set { Test = Int; Other = String; };
+        in
+          _assert.throws (MySet { Test = 5; })
+      ;
+
+      "A typed set allows optional attributes" = { _assert, ... }:
+        let
+          MySet = Set { Test = Maybe { Value = Int; }; };
+        in
+          _assert.all [
+            (_assert (MySet {}).Test.is-nothing.to-nix)
+            (_assert (!(MySet { Test = 5; }).Test.is-nothing.to-nix))
+          ]
+      ;
+    };
+  };
+
+  Maybe = type {
+    name = "Maybe";
+
+    __description = ''
+    Represents an optional value. It provides safe methods to access the optional
+    value in a consice way.
+    '';
+
+    type-args = { Value = kind.any; };
+
+    new = { Value, ... }: {
+      type = Arrow { From = Any; To = Any; };
+      __member = arg:
+        if arg == null
+        then null
+        else Value arg
+      ;
+    };
+
+    members = { self, Value, ... }: {
+
+      match-any = {
+
+        __description = ''
+        Method for pattern matching this option type. It offers a syntacs like:
+
+        <code>
+          maybe-value.match-any {
+            Just = value: fn value;
+            Nothing = default-value;
+          }
+        </code>
+
+        This is the non-generic version of the 'match' method which doesn't require
+        a typecheck on the result.
+        '';
+
+        type = Arrow { From = Set { Just = Arrow { From = Value; To = Any; }; Nothing = Any; }; To = Any; };
+        __member = _: pattern:
+          if self.focal == null
+          then pattern.Nothing
+          else pattern.Just self.focal
+        ;
+      };
+
+      is-nothing = {
+        type = Bool;
+        __member = _: self.focal == null;
+      };
+
+      match = {
+        type-args = { Result = kind.any; };
+        type = { Result, ... }: Arrow {
+          From = Set { Just = Arrow { From = Value; To = Result; }; Nothing = Result; };
+          To = Result;
+        };
+        __member = { Result, ... }: self.match-any;
+      };
+    };
+  };
+
+  type = Type;
+
+  type-export = {
     __description = ''
       Define a new type by providing a type spec.
     '';
@@ -469,9 +734,9 @@ let
           Dummy = type {
             name = "Dummy";
 
-            __functor = {
+            new = { ... }: {
               type = Arrow { From = Int; To = Int; }; #[Int "->" Int];
-              __functor = _: i: i "*" 2;
+              __member = i: i "*" 2;
             };
 
             members = { ... }: {
@@ -490,6 +755,11 @@ let
           Member = type {
             name = "Member";
 
+            new = { ... }: {
+              type = Arrow { From = Int; To = Int; };
+              __member = i: i;
+            };
+
             members = { self, ... }: {
 
               replicate = {
@@ -502,13 +772,14 @@ let
           input = Int 5;
           expected = input;
         in
-          _assert.eq ((value.replicate 3) "!!" 1).focal expected.focal
+          _assert.eq ((value.replicate 3) "!!" 1).to-nix expected.to-nix
       ;
 
       "Types have an instance context" = { _assert, ... }:
         let
           Test = type {
             name = "instance";
+            new = { ... }: { type = Arrow { From = Int; To = Int; }; __member = i: i; };
             members = { ... }: {};
           };
           test = Test 1;
@@ -520,6 +791,8 @@ let
         let
           Dodgey = type {
             name = "Dodgey";
+
+            new = { ... }: { type = Arrow { From = Int; To = Int; }; __member = i: i; };
 
             members = { self, ... }: {
 
@@ -539,11 +812,16 @@ let
           Dummy = type {
             name = "Dummy";
 
+            new = { ... }: {
+              type = Arrow { From = Int; To = Int; };
+              __member = i: i;
+            };
+
             members = { self, ... }: {
 
               concat = {
                 type = Arrow { From = Dummy; To = Dummy; };
-                __member = _: other: self.focal + other.focal;
+                __member = _: other: self.focal "+" other.focal;
               };
             };
 
@@ -569,11 +847,92 @@ let
 
           value = Dummy 5;
         in
-          _assert.eq 20 (value.concat-many [ 1 2 3 4 5 ]).focal
+          _assert.eq 20 (value.concat-many [ 1 2 3 4 5 ]).focal.focal
+      ;
+
+      "It can define generic types" = { _assert, ... }:
+        let
+          Cell = type {
+            name = "Cell";
+            type-args = { Item = kind.any; };
+
+            new = { Item, ...}: {
+              type = Arrow { From = Item; To = Item; };
+              __member = value: value;
+            };
+
+            members = { self, Item, ... }: {
+
+              get = {
+                type = Item;
+                __member = _: self.focal;
+              };
+
+              set = {
+                type = Arrow { From = Item; To = Cell { inherit Item; }; };
+                __member = _: value: Cell { inherit Item; } value;
+              };
+            };
+          };
+          ICell = Cell { Item = Int; };
+          iCell = ICell 42;
+          iCell2 = iCell.set 43;
+        in
+          _assert.all [
+            (_assert.eq iCell.get.to-nix 42)
+            (_assert.eq iCell2.get.to-nix 43)
+            (_assert.throws ((iCell.set "hello").get.focal))
+          ]
+      ;
+    };
+  };
+
+  maybe = {
+
+    __description = "";
+
+    __functor = _: Maybe;
+
+    __tests = {
+
+      "match-any applies function when it contains a value." = { _assert, ... }:
+        let
+          m-value = Maybe { Value = Int; } 41;
+          actual = m-value.match-any {
+            Just = n: n "+" 1;
+            Nothing = 666;
+          };
+          expected = Int 42;
+        in
+          _assert.eq actual.to-nix expected.to-nix
+      ;
+
+      "match applies a function when it contains a value." = { _assert, ... }:
+        let
+          m-value = Maybe { Value = Int; } 41;
+          actual = m-value.match { Result = Int; } {
+            Just = n: n "+" 1;
+            Nothing = 666;
+          };
+          expected = Int 42;
+        in
+          _assert.eq actual.to-nix expected.to-nix
+      ;
+
+      "match checks that the return value has the correct type." = { _assert, ... }:
+        let
+          m-value = Maybe { Value = Int; } 41;
+          actual = m-value.match { Result = Int; } {
+            Just = x: x.raw-string;
+            Nothing = "No";
+          };
+        in
+          _assert.throws actual.focal
       ;
     };
   };
 in
 test {
-  inherit List Int String Arrow type;
+  inherit List Int String Arrow Maybe maybe Set;
+  type = type-export;
 }

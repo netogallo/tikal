@@ -95,7 +95,7 @@ let
     __functor = _: mdl:
       let
         tested-mdl = builtins.mapAttrs run-tests mdl;
-        get-test-results = _: value:
+        get-test-results = name: value:
           if builtins.hasAttr tikal-meta.tests-uid value
           then [ value.${tikal-meta.tests-uid} ]
           else []

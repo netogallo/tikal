@@ -19,18 +19,27 @@ let
     result will depend on how the strict parameter is set.
     '';
 
-    __functor = self: { strict ? false, default ? null }: path-any: obj:
+    __functor = self: { strict ? false, default ? null, error ? null, validate ? (_: true) }: path-any: obj:
       let
         path = to-list-path path-any;
         path-str = concatStringsSep "." path;
-        empty = if strict then throw "Attribute '${path-str}' not in object." else default;
+        empty =
+          if strict && error != null
+          then throw (error { inherit obj; path = path-str; })
+          else if strict
+          then throw "Attribute '${path-str}' not in object."
+          else default
+        ;
         cata = s: a:
           if s == null || builtins.typeOf s != "set" || !(hasAttr a s)
 	        then empty
 	        else getAttr a s;
+        result = builtins.foldl' cata obj path;
       in
-        builtins.foldl' cata obj path;
-
+        if validate { inherit result; }
+        then result
+        else empty
+    ;
     __end = "getAttrDeepPoly";
   };
 
@@ -117,10 +126,10 @@ let
         then v
         else builtins.toString v
       ;
-      render-item = k: builtins.trace "rendering ${k}" (render (builtins.getAttr k value));
+      render-item = k: "${k} = ${render (builtins.getAttr k value)}";
       set-items =
         builtins.concatStringsSep
-        ", "
+        "; "
         (map render-item (attrNames value))
       ;
       set-str = "{${set-items}}";

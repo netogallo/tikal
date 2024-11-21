@@ -90,7 +90,10 @@ let
         context-uid = pkg.uid;
         tests-uid = "${pkg.uid}-tests";
       };
-      prim-context = { inherit nixpkgs; inherit tikal-meta; inherit prim; inherit config; };
+      prim-context = {
+        inherit nixpkgs tikal-meta prim config;
+        callPackage = nixpkgs.newScope prim-context;
+      };
       context-factory = import ./context.nix prim-context;
       testlib-factory = import ./test.nix prim-context; 
       type-factory = import ./type.nix prim-context; 
@@ -114,7 +117,8 @@ let
             tests = tests ++ module-tests; 
           }
       ;
-      domain = lib.foldl import-module { state = {}; tests = []; } modules-meta;
+      domain = lib.foldl import-module { state = {}; tests = []; } (
+        builtins.trace "modules meta: ${prim.pretty-print (map (m: m.name) modules-meta)}" modules-meta);
       tests-drv = nixpkgs.symlinkJoin {
         name = tikal-meta.tests-uid;
         paths = domain.tests;
