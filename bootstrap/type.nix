@@ -423,6 +423,10 @@ let
     __functor = _: Trait;
   };
 
+  kind = {
+    any = 0;
+  };
+
   type = {
     __description = ''
       Define a new type by providing a type spec.
@@ -572,6 +576,18 @@ let
         in
           _assert.eq 20 (value.concat-many [ 1 2 3 4 5 ]).focal
       ;
+
+      "It can define generic types" = { _assert, ... }:
+        let
+          Cell = type {
+            name = "Cell";
+
+            __functor = {
+              args = { Item = kind.any; };
+              type = { Item }: Arrow { From = Item; To = Item; };
+              __member = value: value;
+            };
+          };
     };
   };
 in
