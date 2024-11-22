@@ -301,5 +301,5 @@ let
   };
 in
 test {
-  inherit context;
+  inherit context trivial;
 }

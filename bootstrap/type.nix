@@ -1,4 +1,4 @@
-{ nixpkgs, tikal-meta, prim, ... }: { module-meta, context, test, pretty-print, ... }:
+{ nixpkgs, tikal-meta, prim, ... }: { module-meta, context, trivial, test, pretty-print, ... }:
 let
   inherit (prim) pretty-print;
   lib = nixpkgs.lib;
@@ -30,7 +30,7 @@ let
 
   base-type-ctx = { name }: context {
     name = name;
-    __functor = _: arg: context (arg // { name = "${name}-instance"; });
+    __functor = trivial.constructor (arg: context (arg // { name = "${name}-instance"; }));
     members = { self, ...}: {
 
       type-variant = {
@@ -92,12 +92,14 @@ let
 
   Int = base-type-ctx { name = "Int"; } {
 
-    __functor = _: value:
-      if builtins.typeOf value == "int"
-      then value
-      else if Int.includes value
-      then value.focal
-      else throw "Expected an integer, got ${pretty-print value}"
+    __functor = trivial.constructor (
+      value:
+        if builtins.typeOf value == "int"
+        then value
+        else if Int.includes value
+        then value.focal
+        else throw "Expected an integer, got ${pretty-print value}"
+      )
     ;
 
     members = { self, ...}: {
@@ -122,7 +124,7 @@ let
 
   Arrow = base-type-ctx { name = "Arrow"; } {
 
-    __functor = _: { From, To }: { inherit From To; };
+    __functor = trivial.constructor ({ From, To }: { inherit From To; });
 
     members = { self, ... }: {
 
@@ -156,16 +158,17 @@ let
 
   List = base-type-ctx { name = "List$1"; } {
 
-    __functor = _: { Item }:
+    __functor = _: { constructor, ... }: { Item }:
       let
         item-list = base-type-ctx { name = "List$Item"; } {
-          __functor = _: items:
-            if builtins.typeOf items == "list"
-            then map Item items
-            else if item-list.includes items
-            then item-list.focal
-            else throw "Expected a List of Item, got ${pretty-print items}"
-          ;
+          __functor = trivial.constructor(
+            items:
+              if builtins.typeOf items == "list"
+              then map Item items
+              else if item-list.includes items
+              then item-list.focal
+              else throw "Expected a List of Item, got ${pretty-print items}"
+          );
 
           members = { self, ...}: {
 
@@ -194,7 +197,7 @@ let
           };
         };
       in
-        item-list
+        constructor item-list
     ;
 
     members = { self, ...}: {
@@ -209,7 +212,7 @@ let
   make-ctor = {
     __description = "Convert the spec of a type constructor into the spec of a context constructor.";
 
-    __functor = _: spec:
+    __functor = _: spec: ctx:
       let
         type =
           if builtins.hasAttr "type" spec
@@ -217,9 +220,7 @@ let
           else throw "Member function definitions must have a 'type' attribute."
         ;
       in
-      {
-        __functor = _: ctx: type spec ctx;
-      }
+      type spec.__member ctx
     ;
   };
 
@@ -281,7 +282,7 @@ let
   Type = context {
     name = "Type";
 
-    __functor = _: { name, members, ... }@spec: spec;
+    __functor = trivial.constructor ({ name, members, ... }@spec: spec);
 
     members = { self, ...}: {
 
@@ -292,7 +293,7 @@ let
             spec = self.focal;
             members = ctx: builtins.mapAttrs make-type-member (spec.members ctx);
             ctor-attrs = {
-              __functor = _: make-ctor (spec.__functor);
+              __functor = trivial.constructor (make-ctor (spec.__functor));
             };
           in
           context (
@@ -380,7 +381,7 @@ let
   Trait = context {
     name = "Trait";
 
-    __functor = _: { name, members, ... }@spec: spec;
+    __functor = trivial.constructor({ name, members, ... }@spec: spec);
 
     members = { self, ...}: {
       
@@ -429,7 +430,7 @@ let
 
     __functor = _: Type;
 
-    ___tests = {
+    __tests = {
       "It can create an Int instance" = { _assert, ... }:
         _assert.eq (Int 42).focal 42
       ;
@@ -471,7 +472,7 @@ let
 
             __functor = {
               type = Arrow { From = Int; To = Int; }; #[Int "->" Int];
-              __functor = _: i: i "*" 2;
+              __member = i: i "*" 2;
             };
 
             members = { ... }: {
