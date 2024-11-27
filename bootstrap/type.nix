@@ -1,8 +1,9 @@
-{ nixpkgs, tikal-meta, prim, ... }: { module-meta, context, trivial, test, pretty-print, ... }:
+{ nixpkgs, tikal-meta, prim, callPackage, ... }: { module-meta, context, trivial, test, pretty-print, ... }:
 let
   inherit (prim) pretty-print;
   lib = nixpkgs.lib;
   stdenv = nixpkgs.stdenv;
+  prim = callPackage ./lib.nix {};
 
   type-variants = {
     base-type = 0;
@@ -114,6 +115,10 @@ let
 
       raw-string = {
         __member = _: builtins.toString self.focal;
+      };
+
+      to-nix = {
+        __member = _: self.focal;
       };
 
       __functor = {
@@ -279,6 +284,22 @@ let
     ;
   };
 
+  get-ctor-spec =
+    prim.getAttrDeepPoly {
+      strict = true;
+      validate = { result, ... }: builtins.typeOf result == "lambda"; 
+      error = { obj, ... }: ''
+      The spec:
+
+      ${pretty-print obj}
+
+      does not have a 'new' property. Type definitions must have a 'new'
+      property. This property must be a lambda that takes as argument
+      the constructor context and produces a constructor spec.
+      '';
+    } "new"
+  ;
+
   Type = context {
     name = "Type";
 
@@ -292,21 +313,16 @@ let
           let
             spec = self.focal;
             members = ctx: builtins.mapAttrs make-type-member (spec.members ctx);
+            ctor-spec = get-ctor-spec spec {}; 
             ctor-attrs = {
-              __functor = trivial.constructor (make-ctor (spec.__functor));
+              __functor = trivial.constructor (make-ctor ctor-spec);
             };
           in
-          context (
-            {
-              name = "${spec.name}-instance";
-              inherit members;
-            } //
-            (
-              if builtins.hasAttr "__functor" spec
-              then ctor-attrs
-              else {}
-            )
-          )
+          context {
+            name = "${spec.name}-instance";
+            inherit members;
+            __functor = trivial.constructor (make-ctor ctor-spec);
+          }
         ;
       };
 
@@ -345,6 +361,9 @@ let
 
       __functor = {
         __member = _: _: value:
+          let
+            spec = self.focal;
+          in
           if self.instance-context.surrounds value
           then value
           else
@@ -474,7 +493,7 @@ let
           Dummy = type {
             name = "Dummy";
 
-            __functor = {
+            new = { ... }: {
               type = Arrow { From = Int; To = Int; }; #[Int "->" Int];
               __member = i: i "*" 2;
             };
@@ -495,6 +514,11 @@ let
           Member = type {
             name = "Member";
 
+            new = { ... }: {
+              type = Arrow { From = Int; To = Int; };
+              __member = i: i;
+            };
+
             members = { self, ... }: {
 
               replicate = {
@@ -507,13 +531,14 @@ let
           input = Int 5;
           expected = input;
         in
-          _assert.eq ((value.replicate 3) "!!" 1).focal expected.focal
+          _assert.eq ((value.replicate 3) "!!" 1).to-nix expected.to-nix
       ;
 
       "Types have an instance context" = { _assert, ... }:
         let
           Test = type {
             name = "instance";
+            new = { ... }: { type = Arrow { From = Int; To = Int; }; __member = i: i; };
             members = { ... }: {};
           };
           test = Test 1;
@@ -525,6 +550,8 @@ let
         let
           Dodgey = type {
             name = "Dodgey";
+
+            new = { ... }: { type = Arrow { From = Int; To = Int; }; __member = i: i; };
 
             members = { self, ... }: {
 
@@ -544,11 +571,16 @@ let
           Dummy = type {
             name = "Dummy";
 
+            new = { ... }: {
+              type = Arrow { From = Int; To = Int; };
+              __member = i: i;
+            };
+
             members = { self, ... }: {
 
               concat = {
                 type = Arrow { From = Dummy; To = Dummy; };
-                __member = _: other: self.focal + other.focal;
+                __member = _: other: self.focal "+" other.focal;
               };
             };
 
@@ -574,20 +606,39 @@ let
 
           value = Dummy 5;
         in
-          _assert.eq 20 (value.concat-many [ 1 2 3 4 5 ]).focal
+          _assert.eq 20 (value.concat-many [ 1 2 3 4 5 ]).focal.focal
       ;
 
       "It can define generic types" = { _assert, ... }:
         let
           Cell = type {
             name = "Cell";
+            type-args = { Item = kind.any; };
 
-            __functor = {
-              args = { Item = kind.any; };
-              type = { Item }: Arrow { From = Item; To = Item; };
-              __member = value: value;
+            new = { Item, ...}: {
+              type = Arrow { From = Item; To = Item; };
+              __member = _: value: value;
+            };
+
+            members = { self, Item, ... }: {
+
+              get = {
+                type = Item;
+                __member = _: self.focal;
+              };
+
+              set = {
+                type = Arrow { From = Item; To = Cell { inherit Item; }; };
+                __member = _: value: Cell { inherit Item; } value;
+              };
             };
           };
+          iCell = Cell { Item = Int; } 42;
+        in
+          _assert.all [
+            (_assert.eq iCell.get 42)
+          ]
+      ;
     };
   };
 in

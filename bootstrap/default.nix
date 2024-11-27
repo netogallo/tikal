@@ -90,7 +90,10 @@ let
         context-uid = pkg.uid;
         tests-uid = "${pkg.uid}-tests";
       };
-      prim-context = { inherit nixpkgs; inherit tikal-meta; inherit prim; inherit config; };
+      prim-context = {
+        inherit nixpkgs tikal-meta prim config;
+        callPackage = nixpkgs.newScope prim-context;
+      };
       context-factory = import ./context.nix prim-context;
       testlib-factory = import ./test.nix prim-context; 
       type-factory = import ./type.nix prim-context; 
