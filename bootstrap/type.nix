@@ -365,17 +365,17 @@ let
             spec = self.focal;
             type-args = prim.getAttrDeepPoly { default = {}; } "type-args" spec;
             is-generic = type-args != {};
-            is-generic-s = if is-generic then "yes" else "no";
+            targs-ctx = value // { type-args = value; };
             spec-instance =
               spec
               // {
                 type-args = {};
-                new = args: spec.new (args // value);
-                members = args: builtins.trace "spec ctor" (spec.members (args // value));
+                new = args: spec.new (args // targs-ctx);
+                members = args: spec.members (args // targs-ctx);
               }
             ;
           in
-          if builtins.trace "is-generic ${spec.name}? ${is-generic-s}" is-generic
+          if is-generic
           then Type spec-instance 
           else if self.instance-context.surrounds value
           then value
@@ -457,6 +457,48 @@ let
 
   kind = {
     any = 0;
+  };
+
+  Set = type {
+
+    name = "Set";
+
+    type-args = { "*" = kind.any; };
+
+    new = { type-args, ... }: {
+      type = Arrow { From = Any; To = Any; };
+      __member = arg:
+        let
+          field-mapper = key: t: t arg."${key}";
+        in
+          builtins.mapAttrs field-mapper arg
+      ;
+    };
+
+    members = { self, type-args, ... }:
+      let
+        create-member-fields = name:
+          let
+            field-type = type-args."${name}";
+          in
+            {
+              ${name} = {
+                type = field-type;
+                __member = _: self.focal."${name}";
+              };
+            }
+        ;
+        member-fields-acc = s: name: s // create-member-fields name;
+        member-fields =
+          lib.foldl
+          member-fields-acc
+          {}
+          (builtins.attrNames type-args)
+        ; 
+      in
+        member-fields
+        // { }
+    ;
   };
 
   type = {
@@ -654,6 +696,17 @@ let
             (_assert.eq iCell.get.to-nix 42)
             (_assert.eq iCell2.get.to-nix 43)
             (_assert.throws ((iCell.set "hello").get.focal))
+          ]
+      ;
+
+      "It supports a 'Set' type" = { _assert, ... }:
+        let
+          MySet = Set { v1 = Int; v2 = Int; };
+          mySet = { v1 = 5; v2 = 6; };
+        in
+          _assert.all [
+            (_assert.eq mySet.v1 5)
+            (_assert.eq mySet.v2 6)
           ]
       ;
     };
