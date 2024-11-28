@@ -157,7 +157,7 @@ let
       else throw "Expected a string, got ${pretty-print str}"
     ;
 
-    members = {
+    members = { ... }: {
     };
   };
 
@@ -363,8 +363,21 @@ let
         __member = _: _: value:
           let
             spec = self.focal;
+            type-args = prim.getAttrDeepPoly { default = {}; } "type-args" spec;
+            is-generic = type-args != {};
+            is-generic-s = if is-generic then "yes" else "no";
+            spec-instance =
+              spec
+              // {
+                type-args = {};
+                new = args: spec.new (args // value);
+                members = args: builtins.trace "spec ctor" (spec.members (args // value));
+              }
+            ;
           in
-          if self.instance-context.surrounds value
+          if builtins.trace "is-generic ${spec.name}? ${is-generic-s}" is-generic
+          then Type spec-instance 
+          else if self.instance-context.surrounds value
           then value
           else
             check-instance-value (self.extend-with-implied (self.instance-context value))
@@ -617,7 +630,7 @@ let
 
             new = { Item, ...}: {
               type = Arrow { From = Item; To = Item; };
-              __member = _: value: value;
+              __member = value: value;
             };
 
             members = { self, Item, ... }: {
@@ -633,10 +646,12 @@ let
               };
             };
           };
-          iCell = Cell { Item = Int; } 42;
+          ICell = Cell { Item = Int; };
+          SCell = Cell { Item = String; };
+          iCell = ICell 42;
         in
           _assert.all [
-            (_assert.eq iCell.get 42)
+            (_assert.eq (iCell.get.to-nix) 42)
           ]
       ;
     };
