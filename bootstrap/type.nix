@@ -647,11 +647,13 @@ let
             };
           };
           ICell = Cell { Item = Int; };
-          SCell = Cell { Item = String; };
           iCell = ICell 42;
+          iCell2 = iCell.set 43;
         in
           _assert.all [
-            (_assert.eq (iCell.get.to-nix) 42)
+            (_assert.eq iCell.get.to-nix 42)
+            (_assert.eq iCell2.get.to-nix 43)
+            (_assert.throws ((iCell.set "hello").get.focal))
           ]
       ;
     };
