@@ -480,13 +480,18 @@ let
         create-member-fields = name:
           let
             field-type = type-args."${name}";
-          in
-            {
+            field-members = {
               ${name} = {
                 type = field-type;
                 __member = _: self.focal."${name}";
               };
-            }
+            };
+            field-members-names = builtins.attrNames field-members;
+            valid = builtins.all field-is-allowed field-members-names;
+          in
+            if valid
+            then field-members
+            else throw "Set cannot use a reserved field"
         ;
         member-fields-acc = s: name: s // create-member-fields name;
         member-fields =
@@ -495,10 +500,64 @@ let
           {}
           (builtins.attrNames type-args)
         ; 
+        set-members = {};
+        set-reserved-members = builtins.attrNames set-members;
+        field-is-allowed = field:
+          if builtins.all (f: f != field) set-reserved-members
+          then true
+          else throw "The field name '${field}' is reserved and cannot be used as a 'Set' field."
+        ;
       in
         member-fields
-        // { }
+        // set-members
     ;
+  };
+
+  Maybe = type {
+    name = "Maybe";
+
+    __description = ''
+    Represents an optional value. It provides safe methods to access the optional
+    value in a consice way.
+    '';
+
+    type-args = { Value = kind.any; };
+
+    new = { Value, ... }: {
+      type = Arrow { From = Any; To = Any; };
+      __member = arg:
+        if arg == null
+        then null
+        else Value arg
+      ;
+    };
+
+    members = { self, Value, ... }: {
+
+      match-any = {
+
+        __description = ''
+        Method for pattern matching this option type. It offers a syntacs like:
+
+        <code>
+          maybe-value.match-any {
+            Just = value: fn value;
+            Nothing = default-value;
+          }
+        </code>
+
+        This is the non-generic version of the 'match' method which doesn't require
+        a typecheck on the result.
+        '';
+
+        type = Arrow { From = Set { Just = Arrow { From = Value; To = Any; }; Nothing = Any; }; To = Any; };
+        __member = _: pattern:
+          if self.focal == null
+          then pattern.Nothing
+          else pattern.Just self.focal
+        ;
+      };
+    };
   };
 
   type = {
@@ -699,7 +758,7 @@ let
           ]
       ;
 
-      "It supports a 'Set' type" = { _assert, ... }:
+      "It supports a 'Set' type!!" = { _assert, ... }:
         let
           MySet = Set { v1 = Int; v2 = Int; };
           mySet = { v1 = 5; v2 = 6; };
@@ -711,7 +770,28 @@ let
       ;
     };
   };
+
+  maybe = {
+
+    __description = "";
+
+    __functor = _: Maybe;
+
+    __tests = {
+
+      "match-any applies function when it contains a value." = { _assert, ... }:
+        let
+          m-value = Maybe { Value = Int; } 41;
+          actual = m-value.match-any {
+            Just = n: n "+" 1;
+          };
+          expected = Int 42;
+        in
+          _assert.eq actual expected
+      ;
+    };
+  };
 in
 test {
-  inherit List Int String Arrow type;
+  inherit List Int String Arrow Maybe maybe type;
 }

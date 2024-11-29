@@ -85,16 +85,16 @@ let
           else value
         ;
       in
-        if builtins.hasAttr "__tests" value
+        builtins.trace "${key} = ${pretty-print value}" (if builtins.hasAttr "__tests" value
         then apply-tests result (value // { ${tikal-meta.tests-uid} = result-drv; })
-        else value
+        else value)
       ;
   };
 
   test = {
     __functor = _: mdl:
       let
-        tested-mdl = builtins.mapAttrs run-tests mdl;
+        tested-mdl = builtins.mapAttrs run-tests (builtins.trace "${pretty-print mdl}" mdl);
         get-test-results = _: value:
           if builtins.hasAttr tikal-meta.tests-uid value
           then [ value.${tikal-meta.tests-uid} ]
