@@ -94,14 +94,14 @@ let
   test = {
     __functor = _: mdl:
       let
-        tested-mdl = builtins.mapAttrs run-tests (builtins.trace "${pretty-print mdl}" mdl);
-        get-test-results = _: value:
-          if builtins.hasAttr tikal-meta.tests-uid value
+        tested-mdl = builtins.mapAttrs run-tests (builtins.trace "module = ${module-meta.name}; original-module = ${pretty-print mdl}" mdl);
+        get-test-results = name: value:
+          if builtins.hasAttr tikal-meta.tests-uid (builtins.trace "tested-${name} = ${pretty-print value}" value)
           then [ value.${tikal-meta.tests-uid} ]
           else []
         ;
         collected-tests = lib.concatLists (
-          lib.mapAttrsToList get-test-results tested-mdl
+          lib.mapAttrsToList get-test-results (builtins.trace "tested-module = ${pretty-print tested-mdl}" tested-mdl)
         );
         tests-drv = nixpkgs.symlinkJoin {
           name = "${module-meta.name}-tests";
