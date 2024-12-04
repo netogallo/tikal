@@ -1,5 +1,5 @@
 {
-  __functor = _: { context, maybe, test, type, ... }: test {
-    inherit context maybe type;
+  __functor = _: { context, maybe, Set, test, type, ... }: test {
+    inherit context maybe Set type;
   };
 }
