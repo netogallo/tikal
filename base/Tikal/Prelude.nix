@@ -1,3 +1,3 @@
 {
-  __functor = _: { context, test, type, ... }: test {};
+  __functor = _: { context, maybe, test, type, ... }: test {};
 }

@@ -469,9 +469,14 @@ let
       type = Arrow { From = Any; To = Any; };
       __member = arg:
         let
-          field-mapper = key: t: t arg."${key}";
+          field-mapper = key: t:
+            let
+              value = arg."${key}";
+            in
+              t value
+          ;
         in
-          builtins.mapAttrs field-mapper arg
+          builtins.mapAttrs field-mapper type-args
       ;
     };
 
@@ -784,10 +789,11 @@ let
           m-value = Maybe { Value = Int; } 41;
           actual = m-value.match-any {
             Just = n: n "+" 1;
+            Nothing = 666;
           };
           expected = Int 42;
         in
-          _assert.eq actual expected
+          _assert.eq actual.to-nix expected.to-nix
       ;
     };
   };

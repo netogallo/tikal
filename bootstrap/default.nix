@@ -117,7 +117,8 @@ let
             tests = tests ++ module-tests; 
           }
       ;
-      domain = lib.foldl import-module { state = {}; tests = []; } modules-meta;
+      domain = lib.foldl import-module { state = {}; tests = []; } (
+        builtins.trace "modules meta: ${prim.pretty-print (map (m: m.name) modules-meta)}" modules-meta);
       tests-drv = nixpkgs.symlinkJoin {
         name = tikal-meta.tests-uid;
         paths = domain.tests;
