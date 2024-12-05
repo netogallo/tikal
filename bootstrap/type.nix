@@ -918,6 +918,17 @@ let
         in
           _assert.eq actual.to-nix expected.to-nix
       ;
+
+      "match checks that the return value has the correct type." = { _assert, ... }:
+        let
+          m-value = Maybe { Value = Int; } 41;
+          actual = m-value.match { Result = Int; } {
+            Just = x: x.raw-string;
+            Nothing = "No";
+          };
+        in
+          _assert.throws actual.focal
+      ;
     };
   };
 in
