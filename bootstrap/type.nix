@@ -268,11 +268,20 @@ let
           then spec.type
           else throw "Member function definitions must have a 'type' attribute."
         ;
+        type-args = prim.getAttrDeep "type-args" spec;
+        is-generic = type-args != null;
+        member = {
+          __type = type;
+          __member = ctx: type (spec.__member ctx);
+        };
+        generic-member = {
+          __type = type;
+          __member = ctx: targs: type targs (spec.__member (ctx // targs));
+        };
       in
-      {
-        __type = type;
-        __member = ctx: type (spec .__member ctx);
-      }
+        if is-generic
+        then generic-member
+        else member
     ;
   };
 
@@ -664,6 +673,15 @@ let
         type = Bool;
         __member = _: self.focal == null;
       };
+
+      match = {
+        type-args = { Result = kind.any; };
+        type = { Result, ... }: Arrow {
+          From = Set { Just = Arrow { From = Value; To = Result; }; Nothing = Result; };
+          To = Result;
+        };
+        __member = { Result, ... }: self.match-any;
+      };
     };
   };
 
@@ -881,6 +899,18 @@ let
         let
           m-value = Maybe { Value = Int; } 41;
           actual = m-value.match-any {
+            Just = n: n "+" 1;
+            Nothing = 666;
+          };
+          expected = Int 42;
+        in
+          _assert.eq actual.to-nix expected.to-nix
+      ;
+
+      "match applies a function when it contains a value." = { _assert, ... }:
+        let
+          m-value = Maybe { Value = Int; } 41;
+          actual = m-value.match { Result = Int; } {
             Just = n: n "+" 1;
             Nothing = 666;
           };
