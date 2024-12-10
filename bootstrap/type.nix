@@ -692,7 +692,14 @@ let
       Define a new type by providing a type spec.
     '';
 
-    __functor = _: Type;
+    __functor = _: spec:
+      let
+        module-spec-overrides = {
+          name = "${module-meta.name}.${spec.name}"; 
+        };
+      in
+        Type (spec // module-spec-overrides)
+    ;
 
     __tests = {
       "It can create an Int instance" = { _assert, ... }:
@@ -930,15 +937,6 @@ let
           _assert.throws actual.focal
       ;
     };
-  };
-  fn = {
-    __description = ''
-    Wrapper that provides some syntax to easily define typed functions.
-    '';
-
-    __functor = _: { type, __functor }@fun-def =
-      Arrow type fun-def
-    ;
   };
 in
 test {
