@@ -931,8 +931,17 @@ let
       ;
     };
   };
+  fn = {
+    __description = ''
+    Wrapper that provides some syntax to easily define typed functions.
+    '';
+
+    __functor = _: { type, __functor }@fun-def =
+      Arrow type fun-def
+    ;
+  };
 in
 test {
-  inherit List Int String Arrow Maybe maybe Set;
+  inherit List Int String Any Arrow Maybe maybe Set;
   type = type-export;
 }

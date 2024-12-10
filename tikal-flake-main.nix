@@ -1,7 +1,7 @@
 { use, nixpkgs, ... }:
 let
   tikal-tests = use ./test.nix { };
-  tikal-package = use ./tikal/bootstrap/default.nix { };
+  tikal-package = use ./bootstrap/default.nix { };
 in
   {
     packages = {

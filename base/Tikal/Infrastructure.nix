@@ -1,11 +1,11 @@
 {
-  __functor = _: { Tikal, ... }:
+  __functor = _: { Tikal, nixpkgs, ... }:
   let
     inherit (Tikal.Prelude.Trivial) write-text-file;
   in
     {
       domain = _: write-text-file {
-        name = "hello";
+        name = "hellop";
         text = "Hello, World";
       };
     }

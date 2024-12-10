@@ -1,6 +1,4 @@
-{
-  nixpkgs
-}:
+{ nixpkgs, ... }:
 let
   lib = nixpkgs.lib;
   prim = import ./lib.nix { inherit nixpkgs; };
@@ -104,7 +102,7 @@ let
           test = testlib-factory { inherit module-meta; };
           context = context-factory ({ inherit module-meta; } // test);
           type = type-factory ({ inherit module-meta; } // test // context);
-          module-ctx = context // test // type;
+          module-ctx = context // test // type // domain.state // { inherit nixpkgs; };
           module = module-scope path module-ctx;
           module-tests =
             if builtins.hasAttr tikal-meta.tests-uid module
@@ -117,7 +115,7 @@ let
             tests = tests ++ module-tests; 
           }
       ;
-      domain = lib.foldl import-module { state = {}; tests = []; } (
+      domain = builtins.foldl' import-module { state = {}; tests = []; } (
         builtins.trace "modules meta: ${prim.pretty-print (map (m: m.name) modules-meta)}" modules-meta);
       tests-drv = nixpkgs.symlinkJoin {
         name = tikal-meta.tests-uid;
@@ -129,7 +127,7 @@ let
         else { ${tests-prop} = tests-drv; }
       ;
     in
-      domain.state
+      (builtins.trace "${prim.pretty-print domain.state.Tikal.Prelude}" domain.state)
       // { ${tikal-meta.tests-uid} = tests-drv; }
       // tests-context
   ;

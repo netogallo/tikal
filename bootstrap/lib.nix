@@ -54,14 +54,25 @@ let
       rest = tail path;
       next =
         if hasAttr attr obj
-	then getAttr attr obj
-	else {};
+	      then getAttr attr obj
+	      else {}
+      ;
+      current-value = getAttrDeep [ attr ] obj;
+      current-value-type = builtins.typeOf current-value;
+      new-object =
+        # Merge the sets if both are sets, otherwise the value overrides
+        # the attribute in its entirety.
+        if current-value-type == "set" && builtins.typeOf value == "set"
+        then builtins.trace "mergeing attr ${attr}" (obj // { "${attr}" = current-value // value; })
+        else builtins.trace "no merge ${attr}" (obj // { "${attr}" = value; })
+      ;
     in
       if length path == 0
       then obj
       else if length path == 1
-      then obj // { "${attr}" = value; }
+      then new-object
       else obj // { "${attr}" = next // setAttrDeep rest next value; };
+
   findPaths = cond: obj:
     let
       attrs = attrNames obj;
@@ -69,11 +80,12 @@ let
       rest = filter (a: !(elem a matching)) attrs;
       filterRec = a:
         let
-	  nested = getAttr a obj;
-	in
-	if typeOf nested == "set"
-	then map (res: [a] ++ res) (findPaths cond nested)
-	else [];
+	        nested = getAttr a obj;
+	      in
+	        if typeOf nested == "set"
+	        then map (res: [a] ++ res) (findPaths cond nested)
+	        else []
+      ;
       others = concatMap filterRec rest;
     in
       map (a: [a]) matching ++ others; 

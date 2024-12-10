@@ -1,7 +1,11 @@
 {
   inputs = {
+    systems.url = "github:nix-systems/x86_64-linux";
     nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-24.11";
-    utils.url = "github:numtide/flake-utils";
+    utils = {
+      url = "github:numtide/flake-utils";
+      inputs.systems.follows = "systems";
+    };
   };
 
   outputs = { self, nixpkgs-stable, utils, ... }:
@@ -30,7 +34,7 @@
           eachDefaultSystem run
       ;
       exports = {
-        inherit each-supported-system;
+        inherit each-default-system;
       };
     in
     packages // exports
