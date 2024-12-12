@@ -1,4 +1,4 @@
-{ nixpkgs, tikal-meta, prim, callPackage, ... }: { module-meta, context, trivial, test, pretty-print, ... }:
+{ nixpkgs, tikal-meta, prim, callPackage, ... }: { module-meta, context, trivial, test, pretty-print, is-tikal-value, ... }:
 let
   inherit (prim) pretty-print;
   lib = nixpkgs.lib;
@@ -230,7 +230,7 @@ let
               else throw "Expected a List of Item, got ${pretty-print items}"
           );
 
-          members = { self, Self, ...}: {
+          members = { self, ...}: {
 
             at = {
               __description = "Returns the item at the given index.";
@@ -265,7 +265,7 @@ let
                 let
                   fn' = v: ((Arrow { From = Item; To = Bool; } fn) v)._to-nix;
                 in
-                  Self (builtins.filter fn' self.focal)
+                  List { inherit Item; } (builtins.filter fn' self.focal)
               ;
             };
 
@@ -474,7 +474,8 @@ let
             spec = self.focal;
             type-args = prim.getAttrDeepPoly { default = {}; } "type-args" spec;
             is-generic = type-args != {};
-            targs-ctx = value // { type-args = value; };
+            Self = Type spec-instance;
+            targs-ctx = value // { inherit Self; type-args = value; };
             spec-instance =
               spec
               // {
@@ -486,7 +487,7 @@ let
             ;
           in
           if is-generic
-          then Type spec-instance 
+          then Self
           else if self.instance-context.surrounds value
           then value
           else
@@ -791,7 +792,7 @@ let
     };
   };
 
-  match-union-type = type: value:
+  match-union-type = { type, value }:
     let
       m-type = Maybe { Value = type; };
       match-tikal =
@@ -835,12 +836,11 @@ let
 
     new = { Self, type-args, ... }: {
       type = Arrow { From = Any; To = Any; };
-      __member = _: value:
+      __member = value:
         let
-          match-type = _: type:
-            match-union-type { inherit type value; };
-          attr-values = List { Item = Any; } (builtins.attrValues union);
-          union = builtins.mapAttrs match-type value;
+          match-type = _: type: match-union-type { inherit type value; };
+          union = builtins.trace "begin union" (builtins.mapAttrs match-type type-args);
+          attr-values = List { Item = Any; } (builtins.attrValues (builtins.trace union union));
           union-values = (attr-values.filter (m: m.is-just)).map (m: m.to-value);
           validate-union =
             union-values.length.match {
@@ -852,6 +852,8 @@ let
           validate-union
       ;
     };
+
+    members = { ... }: {};
     
     type-args = { "*" = kind.any; };
 
@@ -861,9 +863,7 @@ let
           MyUnion = Union { Num = Int; Str = String; Bo = Bool; };
           bUnion = MyUnion true;
         in
-          __assert.all [
-            (__assert (bUnion.focal.Bo.is-just._to-nix))
-          ]
+          _assert bUnion.focal.Bo.is-just._to-nix
       ;
     };
   };
