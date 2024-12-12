@@ -299,7 +299,11 @@ let
       ;
     };
   };
+  is-tikal-value = value:
+    builtins.typeOf value == "set"
+    && builtins.hasAttr tikal-meta.context-uid value
+  ;
 in
 test {
-  inherit context trivial;
+  inherit context is-tikal-value trivial;
 }

@@ -4,6 +4,7 @@ let
   lib = nixpkgs.lib;
   stdenv = nixpkgs.stdenv;
   prim = callPackage ./lib.nix {};
+  inherit (builtins) typeOf;
 
   type-variants = {
     base-type = 0;
@@ -33,6 +34,11 @@ let
     name = name;
     __functor = trivial.constructor (arg: context (arg // { name = "${name}-instance"; }));
     members = { self, ...}: {
+
+      type-fullname = {
+        __description = "The full qualified name of the type.";
+        __member = _: name;
+      };
 
       type-variant = {
         __description = "Indicate that these are base (builtin) types";
@@ -111,12 +117,16 @@ let
 
     members = { self, ... }: {
 
-      _strict-typecheck = {
-        __member = _: true;
+      _to-nix = {
+        __member = _: self.focal;
       };
 
-      to-nix = {
-        __member = _: self.focal;
+      match = {
+        __member = _: pattern:
+          if self.focal
+          then pattern.True
+          else pattern.False
+        ;
       };
     };
   };
@@ -143,16 +153,22 @@ let
         __member = _: arg-any: Int(self.focal + (Int arg-any).focal);
       };
 
+      match = {
+        __member = _: pattern:
+          if builtins.hasAttr "${self.focal}" pattern
+          then pattern.${self.focal}
+          else if builtins.hasAttr "_" pattern
+          then pattern._
+          else throw "Pattern match failed! The pattern '${pretty-print pattern}' did not match ${self.focal}."
+        ;
+      };
+
       raw-string = {
         __member = _: builtins.toString self.focal;
       };
 
-      to-nix = {
+      _to-nix = {
         __member = _: self.focal;
-      };
-
-      _strict-typecheck = {
-        __member = _: true;
       };
 
       __functor = {
@@ -166,10 +182,6 @@ let
     __functor = trivial.constructor ({ From, To }: { inherit From To; });
 
     members = { self, ... }: {
-
-      _strict-typecheck = {
-        __member = _: true;
-      };
 
       from = {
         __member = _: self.focal.From;
@@ -198,7 +210,7 @@ let
 
     members = { self, ... }: {
 
-      to-nix = {
+      _to-nix = {
         __member = _: self.focal;
       };
     };
@@ -218,7 +230,7 @@ let
               else throw "Expected a List of Item, got ${pretty-print items}"
           );
 
-          members = { self, ...}: {
+          members = { self, Self, ...}: {
 
             at = {
               __description = "Returns the item at the given index.";
@@ -237,6 +249,28 @@ let
                 in
                   builtins.foldl' fn' state self.focal
               ;
+            };
+
+            any = {
+              __member = _: fn:
+                let
+                  fn' = Arrow { From = Item; To = Bool; } fn;
+                in
+                  Bool (builtins.any (v: (fn' v)._to-nix) self.focal)
+              ;
+            };
+
+            filter = {
+              __member = _: fn:
+                let
+                  fn' = v: ((Arrow { From = Item; To = Bool; } fn) v)._to-nix;
+                in
+                  Self (builtins.filter fn' self.focal)
+              ;
+            };
+
+            length = {
+              __member = _: Int (builtins.length self.focal);
             };
 
             __functor = {
@@ -624,8 +658,8 @@ let
           test = MySet { Test = 5; Other = "5"; };
         in
           _assert.all [
-            (_assert.eq test.Test.to-nix 5)
-            (_assert.eq test.Other.to-nix "5")
+            (_assert.eq test.Test._to-nix 5)
+            (_assert.eq test.Other._to-nix "5")
           ]
       ;
 
@@ -641,8 +675,8 @@ let
           MySet = Set { Test = Maybe { Value = Int; }; };
         in
           _assert.all [
-            (_assert (MySet {}).Test.is-nothing.to-nix)
-            (_assert (!(MySet { Test = 5; }).Test.is-nothing.to-nix))
+            (_assert (MySet {}).Test.is-nothing._to-nix)
+            (_assert (!(MySet { Test = 5; }).Test.is-nothing._to-nix))
           ]
       ;
     };
@@ -698,6 +732,11 @@ let
         __member = _: self.focal == null;
       };
 
+      is-just = {
+        type = Bool;
+        __member = _: self.focal != null;
+      };
+
       match = {
         type-args = { Result = kind.any; };
         type = { Result, ... }: Arrow {
@@ -706,10 +745,128 @@ let
         };
         __member = { Result, ... }: self.match-any;
       };
+
+      to-value = {
+        type = Value;
+        __member = _:
+          self.is-just.match {
+            True = self.focal;
+            False = throw "'to-value' called on an empty option.";
+          };
+      };
     };
   };
 
   Nothing = targs: Maybe targs null;
+
+  Tuple2 = type {
+    name = "Tuple2";
+    type-args = { "1" = kind.any; "2" = kind.any; };
+
+    new = { type-args, ... }: {
+      type = Arrow { From = Any; To = Any; };
+      __member = arg:
+        let
+          not-list-error = "The value '${pretty-print arg}' must be a List of length 2.";
+          value1 = type-args."1" (builtins.elemAt arg 0);
+          value2 = type-args."2" (builtins.elemAt arg 1);
+        in
+          if typeOf arg != "list" || builtins.length arg != 2
+          then throw not-list-error
+          else { "1" = value1; "2" = value2; }
+      ;
+    };
+
+    members = { self, type-args, ... }: {
+      
+      "1" = {
+        type = type-args."1";
+        __member = _: self.focal."1";
+      };
+
+      "2" = {
+        type = type-args."2";
+        __member = _: self.focal."2";
+      };
+    };
+  };
+
+  match-union-type = type: value:
+    let
+      m-type = Maybe { Value = type; };
+      match-tikal =
+        if type.includes value
+        then m-type value
+        else m-type null
+      ;
+      prim-props = List { Item = List { Item = Tuple2 { "1" = String; "2" = Any; }; }; } [
+        [ "int" Int ]
+        [ "string" String ]
+        [ "bool" Bool ]
+      ];
+      is-prim =
+        prim-props.any (props: props."1" "==" (typeOf value) "&&" (props."2" "==" type));
+    in
+      if is-tikal-value value
+      then match-tikal
+      else if is-prim._to-nix
+      then m-type value
+      else throw "Could not construct an union."
+  ;
+
+  print-type = t: t.type-fullname;
+
+  Union = type {
+
+    name = "Union";
+  
+    __description = ''
+      Type that represents an Union of types. For specific values, it will be able
+      to directly convert the value into the right value within the union. For other
+      values, it will use regular typechecking to match the value into the respective
+      item in the union. The type argument attributes can have any names. Instance
+      values of a union will offer members named after the type attributes which produce
+      a "Maybe" value indicating wether that value matched the union or not.
+
+      Note that if a primitive attribute set is provided, the Union's constructor
+      *will* have to evaluate the attribute set in order to establish wether the
+      set matches any of the types in the Union.
+    '';
+
+    new = { Self, type-args, ... }: {
+      type = Arrow { From = Any; To = Any; };
+      __member = _: value:
+        let
+          match-type = _: type:
+            match-union-type { inherit type value; };
+          attr-values = List { Item = Any; } (builtins.attrValues union);
+          union = builtins.mapAttrs match-type value;
+          union-values = (attr-values.filter (m: m.is-just)).map (m: m.to-value);
+          validate-union =
+            union-values.length.match {
+              "0" = throw "The value ${pretty-print value} does not match the type ${print-type Self}";
+              "1" = union;
+              _ = throw "The union type ${print-type Self} is ambigous. Multiple matches for ${pretty-print value}";
+            };
+        in
+          validate-union
+      ;
+    };
+    
+    type-args = { "*" = kind.any; };
+
+    __tests = {
+      "Union works on built in types" = { _assert, ... }:
+        let
+          MyUnion = Union { Num = Int; Str = String; Bo = Bool; };
+          bUnion = MyUnion true;
+        in
+          __assert.all [
+            (__assert (bUnion.focal.Bo.is-just._to-nix))
+          ]
+      ;
+    };
+  };
 
   type = Type;
 
@@ -805,7 +962,7 @@ let
           input = Int 5;
           expected = input;
         in
-          _assert.eq ((value.replicate 3) "!!" 1).to-nix expected.to-nix
+          _assert.eq ((value.replicate 3) "!!" 1)._to-nix expected._to-nix
       ;
 
       "Types have an instance context" = { _assert, ... }:
@@ -912,18 +1069,9 @@ let
           iCell2 = iCell.set 43;
         in
           _assert.all [
-            (_assert.eq iCell.get.to-nix 42)
-            (_assert.eq iCell2.get.to-nix 43)
+            (_assert.eq iCell.get._to-nix 42)
+            (_assert.eq iCell2.get._to-nix 43)
             (_assert.throws ((iCell.set "hello").get.focal))
-          ]
-      ;
-
-      "It can do strict typechecking" = { _assert, ... }:
-        let
-          iValue = Int "yes";
-        in
-          _assert.all [
-            (_assert.throws (iValue._strict-typecheck))
           ]
       ;
     };
@@ -946,7 +1094,7 @@ let
           };
           expected = Int 42;
         in
-          _assert.eq actual.to-nix expected.to-nix
+          _assert.eq actual._to-nix expected._to-nix
       ;
 
       "match applies a function when it contains a value." = { _assert, ... }:
@@ -958,7 +1106,7 @@ let
           };
           expected = Int 42;
         in
-          _assert.eq actual.to-nix expected.to-nix
+          _assert.eq actual._to-nix expected._to-nix
       ;
 
       "match checks that the return value has the correct type." = { _assert, ... }:
@@ -975,7 +1123,7 @@ let
   };
 in
 test {
-  inherit List Int String Any Arrow Maybe maybe Set;
+  inherit List Int String Any Arrow Maybe maybe Set Union;
   type = type-export;
   Type = TypeClass;
 }
