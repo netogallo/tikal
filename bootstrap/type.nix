@@ -94,6 +94,8 @@ let
     '';
 
     __functor = _: value: value;
+
+    generic-type = null;
   };
 
   Bool = base-type-ctx { name = "Bool"; } {
@@ -108,6 +110,10 @@ let
     );
 
     members = { self, ... }: {
+
+      _strict-typecheck = {
+        __member = _: true;
+      };
 
       to-nix = {
         __member = _: self.focal;
@@ -145,6 +151,10 @@ let
         __member = _: self.focal;
       };
 
+      _strict-typecheck = {
+        __member = _: true;
+      };
+
       __functor = {
         __member = _: _: op: self."${op}";
       };
@@ -156,6 +166,10 @@ let
     __functor = trivial.constructor ({ From, To }: { inherit From To; });
 
     members = { self, ... }: {
+
+      _strict-typecheck = {
+        __member = _: true;
+      };
 
       from = {
         __member = _: self.focal.From;
@@ -506,6 +520,8 @@ let
     };
   };
 
+  TypeClass = Any;
+
   trait = {
     __description = ''
       Function that allows defining traits.
@@ -533,7 +549,10 @@ let
         let
           field-mapper = key: t:
             let
-              allow-empty = t.generic-type != null && t.generic-type.type-fullname == Maybe.type-fullname;
+              allow-empty =
+                t.generic-type != null
+                && t.generic-type.type-fullname == Maybe.type-fullname
+              ;
             in {
               value = 
                 if builtins.hasAttr key arg
@@ -581,7 +600,12 @@ let
           {}
           (builtins.attrNames type-args)
         ; 
-        set-members = {};
+        set-members = {
+          _lookup-any = {
+            type = Arrow { From = String; To = Any; };
+            __member = _: path: prim.getAttrDeepPoly { strict = false; default = Nothing { Value = Any; }; } path self;  
+          };
+        };
         set-reserved-members = builtins.attrNames set-members;
         field-is-allowed = field:
           if builtins.all (f: f != field) set-reserved-members
@@ -684,6 +708,8 @@ let
       };
     };
   };
+
+  Nothing = targs: Maybe targs null;
 
   type = Type;
 
@@ -891,6 +917,15 @@ let
             (_assert.throws ((iCell.set "hello").get.focal))
           ]
       ;
+
+      "It can do strict typechecking" = { _assert, ... }:
+        let
+          iValue = Int "yes";
+        in
+          _assert.all [
+            (_assert.throws (iValue._strict-typecheck))
+          ]
+      ;
     };
   };
 
@@ -942,4 +977,5 @@ in
 test {
   inherit List Int String Any Arrow Maybe maybe Set;
   type = type-export;
+  Type = TypeClass;
 }
