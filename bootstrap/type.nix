@@ -128,6 +128,16 @@ let
           else pattern.False
         ;
       };
+
+      "&&" = {
+        __member = _: other:
+          Bool (self.focal && (Bool other).focal)
+        ;
+      };
+
+      __functor = {
+        __member = _: _: name: self.${name};
+      };
     };
   };
 
@@ -155,11 +165,14 @@ let
 
       match = {
         __member = _: { Result }: pattern:
-          if builtins.hasAttr "${self.focal}" pattern
-          then Result (pattern.${self.focal})
-          else if builtins.hasAttr "_" pattern
-          then Result pattern._
-          else throw "Pattern match failed! The pattern '${pretty-print pattern}' did not match ${self.focal}."
+          let
+            key = builtins.toString self.focal;
+          in
+            if builtins.hasAttr "${key}" pattern
+            then Result (pattern.${key})
+            else if builtins.hasAttr "_" pattern
+            then Result pattern._
+            else throw "Pattern match failed! The pattern '${pretty-print pattern}' did not match ${self.focal}."
         ;
       };
 
@@ -212,6 +225,16 @@ let
 
       _to-nix = {
         __member = _: self.focal;
+      };
+
+      "==" = {
+        __member = _: other:
+          Bool (self.focal == (String other).focal)
+        ;
+      };
+
+      __functor = {
+        __member = _: _: prop: self.${prop};
       };
     };
   };
@@ -274,7 +297,7 @@ let
             };
 
             map = {
-              __member = _: fn: builtins.map fn self.focal;
+              __member = _: fn: List { inherit Item; } (builtins.map fn self.focal);
             };
 
             __functor = {
@@ -810,13 +833,18 @@ let
         [ "bool" Bool ]
       ];
       is-prim =
-        prim-props.any (props: props._1 "==" (typeOf value) "&&" (props._2 "==" type));
+        prim-props.any (
+          props:
+            props._1 "==" (typeOf value) "&&"
+            (props._2.type-fullname == type.type-fullname)
+        )
+      ;
     in
       if is-tikal-value value
       then match-tikal
       else if is-prim._to-nix
       then m-type value
-      else throw "Could not construct an union."
+      else m-type null
   ;
 
   print-type = t: t.type-fullname;
@@ -844,10 +872,10 @@ let
       type = Arrow { From = Any; To = Any; };
       __member = value:
         let
-          match-type = _: ty: match-union-type { type = ty; value = builtins.trace "In: ${builtins.typeOf value}" value;};
+          match-type = _: ty: match-union-type { type = ty; inherit value; };
           union = builtins.mapAttrs match-type type-args;
           attr-values = List { Item = Any; } (builtins.attrValues union);
-          union-values = (attr-values.filter (m: m.is-just)).map (m: (builtins.trace "map" m).to-value);
+          union-values = (attr-values.filter (m: m.is-just)).map (m: m.to-value);
           validate-union =
             union-values.length.match { Result = Any; } {
               "0" = throw "The value ${pretty-print value} does not match the type ${print-type Self}";
@@ -855,7 +883,7 @@ let
               _ = throw "The union type ${print-type Self} is ambigous. Multiple matches for ${pretty-print value}";
             };
         in
-          builtins.trace validate-union validate-union
+          validate-union
       ;
     };
 
