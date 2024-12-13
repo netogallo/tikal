@@ -42,7 +42,9 @@ let
       uid = (builtins.hashString "sha256" "${module-meta.name}.${spec.name}") + "-${spec.name}";
 
       surrounds = value:
-        getAttrDeep [ tikal-meta.context-uid uid ] value != null;
+        builtins.typeOf value == "set"
+        && getAttrDeep [ tikal-meta.context-uid uid ] value != null
+      ;
 
       members = ctx:
         let

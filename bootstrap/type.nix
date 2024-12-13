@@ -104,6 +104,20 @@ let
     generic-type = null;
   };
 
+  Prim = {
+    __description = ''
+    Used to represent nix primitive values. This will not wrap the
+    value with a context and throws an error if a contextualized
+    value is provided.
+    '';
+
+    __functor = _: value:
+      if is-tikal-value value
+      then throw ''The value ${pretty-print value} is not a primitive value and cannot have type Prim''
+      else value
+    ;
+  };
+
   Bool = base-type-ctx { name = "Bool"; } {
     
     __functor = trivial.constructor (
@@ -300,6 +314,19 @@ let
               __member = _: fn: List { inherit Item; } (builtins.map fn self.focal);
             };
 
+            _to-nix = {
+              __member = _:
+                let
+                  map-to-nix = value:
+                    if is-tikal-value value
+                    then (trace-value "map-to-nix" value)._to-nix
+                    else value
+                  ;
+                in
+                  builtins.map map-to-nix self.focal
+              ;
+            };
+
             __functor = {
               __member = _: _: prop: self.${prop};
             };
@@ -420,7 +447,7 @@ let
   Type = context {
     name = "Type";
 
-    __functor = trivial.constructor ({ name, members, ... }@spec: spec-defaults // spec);
+    __functor = trivial.constructor ({ name, members, new, ... }@spec: spec-defaults // spec);
 
     members = { self, ...}: {
 
@@ -548,6 +575,17 @@ let
     ;
   };
 
+  gequal = {
+    
+    __functor = _: eq1: eq2:
+      if is-tikal-value eq1
+      then eq1 "==" eq2
+      else if is-tikal-value eq2
+      then eq2 "==" eq1
+      else eq1 == eq2
+    ;
+  };
+
   Trait = context {
     name = "Trait";
 
@@ -617,12 +655,16 @@ let
               ;
             in {
               value = 
-                if builtins.hasAttr key arg
+                if builtins.typeOf arg != "set"
+                then throw "A set must be used to construct a value of type Set, found ${pretty-print arg}"
+                else if builtins.hasAttr key arg
                 then t arg."${key}"
                 else t null
               ;
               valid =
-                if builtins.hasAttr key arg || allow-empty
+                if builtins.typeOf arg != "set"
+                then throw "A set must be used to construct a value of type Set, found ${pretty-print arg}"
+                else if builtins.hasAttr key arg || allow-empty
                 then true
                 else throw ''The set "${pretty-print arg}" is missing the key "${key}"''
               ;
@@ -663,9 +705,27 @@ let
           (builtins.attrNames type-args)
         ; 
         set-members = {
+
           _lookup-any = {
             type = Arrow { From = String; To = Any; };
             __member = _: path: prim.getAttrDeepPoly { strict = false; default = Nothing { Value = Any; }; } path self;  
+          };
+
+          _to-nix = {
+            type = Prim;
+            __member = _:
+              let
+                to-prim = attr: _:
+                  let
+                    value = self.focal.${attr};
+                  in
+                    if trace-value "to-prim-if" is-tikal-value value
+                    then trace-value "to-prim" value._to-nix
+                    else value
+                ;
+              in
+                builtins.mapAttrs to-prim type-args
+            ;
           };
         };
         set-reserved-members = builtins.attrNames set-members;
@@ -887,17 +947,36 @@ let
       ;
     };
 
-    members = { ... }: {};
+    members = { self, type-args, ... }:
+      let
+        make-attribute-member = name: type: {
+          type = Maybe { Value = type; };
+          __member = _: self.focal.${name};
+        };
+        attribute-members = builtins.mapAttrs make-attribute-member type-args;
+      in
+        attribute-members
+        // {
+        }
+    ;
     
     type-args = { "*" = kind.any; };
 
     __tests = {
-      "Union works on built in types" = { _assert, ... }:
+      "Union works on built in types" = { _assert, Assert, ... }:
         let
           MyUnion = Union { Num = Int; Str = String; Bo = Bool; };
           bUnion = MyUnion true;
+          iUnion = MyUnion 42;
+          sUnion = MyUnion "hello";
         in
-          _assert bUnion.focal.Bo.is-just._to-nix
+          _assert true #Assert true #bUnion.Bo.is-just
+          #Assert.all [
+          #  (Assert bUnion.Bo.is-just)
+          #  (Assert bUnion.Num.is-nothing)
+          #  (Assert bUnion.Str.is-nothing)
+          #  (Assert iUnion.Num.is-just)
+          #]
       ;
     };
   };
@@ -1155,9 +1234,76 @@ let
       ;
     };
   };
+
+  #Outcome = Set { test = String; success = Bool; };
+  Outcome = String;
+
+  AssertType = type {
+    name = "Assert";
+
+    __description = ''
+    Wrapper around the base "_assert" object which works with both contextualized
+    values and native values.
+    '';
+
+    new = { ... }: {
+      type = Arrow { From = Prim; To = Prim; };
+      __member = _assert: _assert;
+    };
+
+    members = { self, ... }: {
+
+      __functor = {
+        type = Arrow { From = Any; To = String; };
+        __member = throw "NO"; #_: _: _: self.focal test._to-nix;
+      };
+
+      eq = {
+        type-args = { Value = kind.any; };
+        type = { Value, ... }: Arrow { From = Value; To = Arrow { From = Value; To = Outcome; }; };
+        __member = _: eq1: eq2: self.focal.eq-by gequal eq1 eq2;
+      };
+
+      all = {
+        type = Arrow { From = List { Item = Outcome; }; To = Outcome; };
+        __member = _: outcomes: self.focal.all outcomes._to-nix;
+      };
+    };
+  };
+
+  test-typed = {
+
+    __functor = _: items:
+      let
+        add-typed-assert-to-test = value:
+          let
+            mk-test-with-typed-assert = name: test: { _assert, ... }@base-test-ctx:
+              let
+                Assert = AssertType _assert;
+                typed-result = test (base-test-ctx // { inherit Assert; });
+              in
+                if is-tikal-value (builtins.trace "${pretty-print (Assert true)}" (Assert true)) #typed-result
+                then typed-result._to-nix
+                else typed-result
+            ;
+            __tests = builtins.mapAttrs mk-test-with-typed-assert value.__tests;
+          in
+            if builtins.hasAttr "__tests" value
+            then value // { inherit __tests; }
+            else value
+        ;
+        include-typed-assert = _: value:
+          if builtins.typeOf value == "set"
+          then add-typed-assert-to-test value
+          else value
+        ;
+      in
+        test (builtins.mapAttrs include-typed-assert items)
+    ;
+  };
 in
-test {
-  inherit List Int String Any Arrow Maybe maybe Set Union;
+test-typed {
+  inherit List Int String Any Arrow Maybe maybe Set Union test-typed;
   type = type-export;
   Type = TypeClass;
 }

@@ -17,7 +17,7 @@ let
   run-test = rec {
 
     test-context = { name, ... }: {
-      _assert = {
+      _assert = rec {
         __functor = _: value:
           if value
           then outcome.success name
@@ -36,14 +36,16 @@ let
             checks: lib.foldr acc succ checks
         ;
 
-        eq = v1: v2:
-          if v1 == v2
+        eq-by = cmp: v1: v2:
+          if cmp v1 v2
           then outcome.success name
           else outcome.error {
             test = name;
             message = "Expected: ${pretty-print v2}, Got: ${pretty-print v1}";
           }
         ;
+
+        eq = v1: v2: eq-by (e1: e2: e1 == e2) v1 v2;
 
         throws = f:
           let
