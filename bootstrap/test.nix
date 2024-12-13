@@ -85,7 +85,7 @@ let
           else value
         ;
       in
-        if builtins.hasAttr "__tests" value
+        if builtins.typeOf value == "set" && builtins.hasAttr "__tests" value
         then apply-tests result (value // { ${tikal-meta.tests-uid} = result-drv; })
         else value
       ;

@@ -154,11 +154,11 @@ let
       };
 
       match = {
-        __member = _: pattern:
+        __member = _: { Result }: pattern:
           if builtins.hasAttr "${self.focal}" pattern
-          then pattern.${self.focal}
+          then Result (pattern.${self.focal})
           else if builtins.hasAttr "_" pattern
-          then pattern._
+          then Result pattern._
           else throw "Pattern match failed! The pattern '${pretty-print pattern}' did not match ${self.focal}."
         ;
       };
@@ -263,7 +263,7 @@ let
             filter = {
               __member = _: fn:
                 let
-                  fn' = v: ((Arrow { From = Item; To = Bool; } fn) v)._to-nix;
+                  fn' = v: (Arrow { From = Item; To = Bool; } fn v)._to-nix;
                 in
                   List { inherit Item; } (builtins.filter fn' self.focal)
               ;
@@ -271,6 +271,10 @@ let
 
             length = {
               __member = _: Int (builtins.length self.focal);
+            };
+
+            map = {
+              __member = _: fn: builtins.map fn self.focal;
             };
 
             __functor = {
@@ -780,12 +784,12 @@ let
 
     members = { self, type-args, ... }: {
       
-      "1" = {
+      _1 = {
         type = type-args."1";
         __member = _: self.focal."1";
       };
 
-      "2" = {
+      _2 = {
         type = type-args."2";
         __member = _: self.focal."2";
       };
@@ -800,13 +804,13 @@ let
         then m-type value
         else m-type null
       ;
-      prim-props = List { Item = List { Item = Tuple2 { "1" = String; "2" = Any; }; }; } [
+      prim-props = List { Item = Tuple2 { "1" = String; "2" = Any; }; } [
         [ "int" Int ]
         [ "string" String ]
         [ "bool" Bool ]
       ];
       is-prim =
-        prim-props.any (props: props."1" "==" (typeOf value) "&&" (props."2" "==" type));
+        prim-props.any (props: props._1 "==" (typeOf value) "&&" (props._2 "==" type));
     in
       if is-tikal-value value
       then match-tikal
@@ -816,6 +820,8 @@ let
   ;
 
   print-type = t: t.type-fullname;
+
+  trace-value = m: v: builtins.trace "{ message = ${m}; type = ${builtins.typeOf v}; }" (builtins.trace v v);
 
   Union = type {
 
@@ -838,18 +844,18 @@ let
       type = Arrow { From = Any; To = Any; };
       __member = value:
         let
-          match-type = _: type: match-union-type { inherit type value; };
-          union = builtins.trace "begin union" (builtins.mapAttrs match-type type-args);
-          attr-values = List { Item = Any; } (builtins.attrValues (builtins.trace union union));
-          union-values = (attr-values.filter (m: m.is-just)).map (m: m.to-value);
+          match-type = _: ty: match-union-type { type = ty; value = builtins.trace "In: ${builtins.typeOf value}" value;};
+          union = builtins.mapAttrs match-type type-args;
+          attr-values = List { Item = Any; } (builtins.attrValues union);
+          union-values = (attr-values.filter (m: m.is-just)).map (m: (builtins.trace "map" m).to-value);
           validate-union =
-            union-values.length.match {
+            union-values.length.match { Result = Any; } {
               "0" = throw "The value ${pretty-print value} does not match the type ${print-type Self}";
               "1" = union;
               _ = throw "The union type ${print-type Self} is ambigous. Multiple matches for ${pretty-print value}";
             };
         in
-          validate-union
+          builtins.trace validate-union validate-union
       ;
     };
 
