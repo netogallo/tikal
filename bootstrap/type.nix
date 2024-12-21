@@ -975,9 +975,40 @@ let
           __member = _: self.focal.${name};
         };
         attribute-members = builtins.mapAttrs make-attribute-member type-args;
+        match-member-type-args = result:
+          builtins.mapAttrs
+          (_: ty: Arrow { From = ty; To = result; })
+          type-args
+        ;
+        match-member-type = { Result }: Set (match-member-type-args Result);
       in
         attribute-members
         // {
+          _match = {
+            type-args = { Result = kind.any; };
+            type = match-member-type;
+            __member = { Result, ... }: pattern:
+              let
+                match-attr = attr:
+                  self.${attr}.match {
+                    Just = matched: Maybe { Value = Result; } (pattern.${attr} matched);
+                    Nothing = Nothing { Value = Result; };
+                  }
+                ;
+                acc = state: attr:
+                  state.match { inherit Result; } {
+                    Just = Maybe { Value = Result; };
+                    Nothing = match-attr attr; 
+                  }
+                ;
+                m-result = lib.foldl' acc (Nothing { Value = Result; }) (builtins.attrNames pattern);
+              in
+                m-result.match {
+                  Just = result: result;
+                  Nothing = abort "Bug in Union type! The union has no values ${pretty-print self}";
+                }
+            ;
+          };
         }
     ;
     
@@ -997,6 +1028,18 @@ let
             (Assert bUnion.Str.is-nothing)
             (Assert iUnion.Num.is-just)
           ]
+      ;
+      "Unions can be pattern matched" = { _assert, Assert, ... }:
+        let
+          MyUnion = Union { Num = Int; Str = String; Bo = Bool; };
+          bResult =
+            (MyUnion true)._match { Result = Bool; } {
+              Bo = _: true;
+              Str = _: false;
+              Num = _: false;
+            };
+        in
+          Assert bResult
       ;
     };
   };
