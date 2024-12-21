@@ -372,13 +372,34 @@ let
         ;
         type-args = prim.getAttrDeep "type-args" spec;
         is-generic = type-args != null;
+
+        # When the member is called __functor, it defines the action to
+        # be performend when a value is applied to another value.
+        # This follows the way nix uses "__functor". However, nix
+        # will implicitly pass as first argument to the member the
+        # set where that member is defined. In our particular case,
+        # that set is the member's spec, not the object that defines
+        # the memebr (this is passed to the member defintion).
+        # The member's spec is of no relevance, so it will simply be
+        # dropped when the member is called __functor.
+        member-impl =
+          if name == "__functor"
+          then (_: ctx: type (spec.__member ctx))
+          else (ctx: type (spec.__member ctx))
+        ;
         member = {
           __type = type;
-          __member = ctx: type (spec.__member ctx);
+          __member = member-impl;
         };
+
+        generic-member-impl =
+          if name == "__functor"
+          then (_: ctx: targs: type targs (spec.__member (ctx // targs)))
+          else (ctx: targs: type targs (spec.__member (ctx // targs)))
+        ;
         generic-member = {
           __type = type;
-          __member = ctx: targs: type targs (spec.__member (ctx // targs));
+          __member = generic-member-impl;
         };
       in
         if is-generic
@@ -963,20 +984,19 @@ let
     type-args = { "*" = kind.any; };
 
     __tests = {
-      "Union works on built in types" = { _assert, Assert, ... }:
+      "Union works on builtin types" = { _assert, Assert, ... }:
         let
           MyUnion = Union { Num = Int; Str = String; Bo = Bool; };
           bUnion = MyUnion true;
           iUnion = MyUnion 42;
           sUnion = MyUnion "hello";
         in
-          _assert true #Assert true #bUnion.Bo.is-just
-          #Assert.all [
-          #  (Assert bUnion.Bo.is-just)
-          #  (Assert bUnion.Num.is-nothing)
-          #  (Assert bUnion.Str.is-nothing)
-          #  (Assert iUnion.Num.is-just)
-          #]
+          Assert.all [
+            (Assert bUnion.Bo.is-just)
+            (Assert bUnion.Num.is-nothing)
+            (Assert bUnion.Str.is-nothing)
+            (Assert iUnion.Num.is-just)
+          ]
       ;
     };
   };
@@ -1254,8 +1274,8 @@ let
     members = { self, ... }: {
 
       __functor = {
-        type = Arrow { From = Any; To = String; };
-        __member = throw "NO"; #_: _: _: self.focal test._to-nix;
+        type = Arrow { From = Bool; To = Outcome; };
+        __member = _: test: self.focal test._to-nix;
       };
 
       eq = {
@@ -1282,7 +1302,7 @@ let
                 Assert = AssertType _assert;
                 typed-result = test (base-test-ctx // { inherit Assert; });
               in
-                if is-tikal-value (builtins.trace "${pretty-print (Assert true)}" (Assert true)) #typed-result
+                if is-tikal-value typed-result
                 then typed-result._to-nix
                 else typed-result
             ;
