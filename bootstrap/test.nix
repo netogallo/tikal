@@ -3,6 +3,11 @@ let
   lib = nixpkgs.lib;
   inherit (prim) pretty-print;
 
+  trace-verbose = msg: value:
+    if config.verbose-tests
+    then builtins.trace msg value
+    else value
+  ;
   outcome = {
     __functor = _: { test, success, message ? null }:
       if success
@@ -73,7 +78,12 @@ let
     __functor = _: key: value:
       let
         tests = value.__tests;
-        run-test-wrapper = test: run-test { name = test; test = tests.${test}; };
+        run-test-wrapper = test:
+          run-test {
+            name = trace-verbose "Entering Test: '${test}'" test;
+            test = tests.${test};
+          }
+        ;
         outcomes = builtins.map run-test-wrapper (builtins.attrNames tests);
         result = lib.foldl (s: t: "${s}\n${t}") "" outcomes; 
         result-drv = nixpkgs.writeTextFile rec {
@@ -81,14 +91,9 @@ let
           text = result;
           destination = "/tikal/tests/${name}";
         };
-        apply-tests = res: value:
-          if config.verbose-tests
-          then builtins.trace res value
-          else value
-        ;
       in
         if builtins.typeOf value == "set" && builtins.hasAttr "__tests" value
-        then apply-tests result (value // { ${tikal-meta.tests-uid} = result-drv; })
+        then trace-verbose result (value // { ${tikal-meta.tests-uid} = result-drv; })
         else value
       ;
   };

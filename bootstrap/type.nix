@@ -980,7 +980,9 @@ let
           (_: ty: Arrow { From = ty; To = result; })
           type-args
         ;
-        match-member-type = { Result }: Set (match-member-type-args Result);
+        match-member-type = { Result }:
+          Arrow { From = Set (match-member-type-args Result); To = Result; }
+        ;
       in
         attribute-members
         // {
@@ -990,7 +992,7 @@ let
             __member = { Result, ... }: pattern:
               let
                 match-attr = attr:
-                  self.${attr}.match {
+                  (builtins.trace "The att: ${attr}" self.${attr}).match { Result = Maybe { Value = Result; }; } {
                     Just = matched: Maybe { Value = Result; } (pattern.${attr} matched);
                     Nothing = Nothing { Value = Result; };
                   }
@@ -1039,7 +1041,9 @@ let
               Num = _: false;
             };
         in
+          # Assert true
           Assert bResult
+          # Assert ((MyUnion true).Bo.match { Result = Bool; } { Just = _: true; })
       ;
     };
   };
