@@ -18,12 +18,9 @@
       in
         {
           lib = {
-            universe = args: {
+            universe = spec: args: {
               apps = {
-                sync = {
-                  type = "app";
-                  program = "" + dummy;
-                };
+                sync = (pkgs.callPackage ./lib/sync.nix { universe = args; }).app;
               };
             };
           };
