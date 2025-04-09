@@ -14,8 +14,19 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+        dummy = pkgs.writeScript "tikal" "echo hello tikal!";
       in
         {
+          lib = {
+            universe = args: {
+              apps = {
+                sync = {
+                  type = "app";
+                  program = "" + dummy;
+                };
+              };
+            };
+          };
           packages.default = pkgs.writeScript "tikal" "echo hello tikal!"; 
         }
     );
