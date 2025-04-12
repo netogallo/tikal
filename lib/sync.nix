@@ -1,29 +1,22 @@
-{ universe, writeScript, docopts, ... }:
+{ universe, writeScriptBin, docopts, ... }:
 let
   sync-script = ''
-    set -e
-    echo "entering"
-    args="$(${docopts}/bin/docopts -h - : "$@" <<EOF
-    Usage: sync [options]
+    from docopt import docopt
 
-    Options:
-      --help        Show help
-      --version     Print the program's version
+    doc = """
+    Usage: sync [--verbose]
+    """
 
-    ----
-    sync 0.1
-    EOF
-    )"
+    args = docopt(doc)
 
-    echo "''${args[@]}"
-    eval "''${args[@]}"
-    echo "this is sync"
+    for k,v in args.items():
+      print(f"{k} = {v}")
   '';
 in
   rec {
-    package = writeScript "sync" sync-script;
+    package = writeScriptBin "sync" sync-script;
     app = {
       type = "app";
-      program = "${package}";
+      program = "${package}/bin/sync";
     };
   }

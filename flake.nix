@@ -14,13 +14,15 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
-        dummy = pkgs.writeScript "tikal" "echo hello tikal!";
+        xonsh = pkgs.callPackage ./lib/xonsh.nix { inherit nixpkgs; };
+        callPackage = pkgs.newScope (xonsh // { inherit nixpkgs pkgs; }); 
       in
         {
           lib = {
             universe = spec: args: {
               apps = {
-                sync = (pkgs.callPackage ./lib/sync.nix { universe = args; }).app;
+                sync = (callPackage ./lib/sync.nix { universe = args; }).app;
+                xonsh = xonsh.xonsh-app;
               };
             };
           };
