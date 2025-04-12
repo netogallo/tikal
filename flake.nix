@@ -14,14 +14,15 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
-        xonsh = pkgs.callPackage ./lib/xonsh.nix { inherit nixpkgs; };
-        callPackage = pkgs.newScope (xonsh // { inherit nixpkgs pkgs; }); 
+        prelude = pkgs.callPackage ./lib/prelude.nix { };
+        xonsh = pkgs.callPackage ./lib/xonsh.nix (prelude // { inherit nixpkgs; });
+        callPackage = pkgs.newScope (prelude // xonsh // { inherit callPackage nixpkgs pkgs; }); 
       in
         {
           lib = {
             universe = spec: args: {
               apps = {
-                sync = (callPackage ./lib/sync.nix { universe = args; }).app;
+                sync = (callPackage ./lib/sync.nix { universe = callPackage spec {}; }).app;
                 xonsh = xonsh.xonsh-app;
               };
             };

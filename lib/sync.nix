@@ -1,10 +1,14 @@
-{ universe, writeScriptBin, docopts, ... }:
+{ universe, writeScriptBin, docopts, callPackage, ... }:
 let
+  keys = callPackage ./sync/keys.nix { universe = universe.nahuales; };
   sync-script = ''
     from docopt import docopt
 
     doc = """
-    Usage: sync [--verbose]
+    Usage: sync [--directory=<dir>]
+
+    Optionas:
+      --directory=<dir>       The directory to use to store keys and files
     """
 
     args = docopt(doc)
@@ -14,7 +18,7 @@ let
   '';
 in
   rec {
-    package = writeScriptBin "sync" sync-script;
+    package = writeScriptBin "sync" sync-script { sources = [ keys.script ]; };
     app = {
       type = "app";
       program = "${package}/bin/sync";
