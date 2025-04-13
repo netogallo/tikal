@@ -3,7 +3,7 @@
   callPackage,
   pkgs,
   lib,
-  pipe,
+  do,
   ...
 }:
 let
@@ -28,18 +28,18 @@ let
         with open("${save-var name value}", 'r') as jf:
           ${name} = json.load(jf)
       '';
-      vars-txt = pipe
-        (builtins.concatStringsSep "\n")
-        (vvs: [ "import json" ] ++ vvs)
-        builtins.attrValues
-        (builtins.mapAttrs mk-var)
-        "<|" vars
-      ;
-      sources-txt = pipe
-        (builtins.concatStringsSep "\n")
-        (map (file: ''source "${file}"''))
-        "<|" sources
-      ;
+      vars-txt = do [
+        vars
+        "||>" builtins.mapAttrs mk-var
+        "|>" builtins.attrValues
+        "|>" (vvs: [ "import json" ] ++ vvs)
+        "|>" builtins.concatStringsSep "\n"
+      ];
+      sources-txt = do [
+        sources
+        "||>" map (file: ''source "${file}"'')
+        "|>" builtins.concatStringsSep "\n"
+      ];
     in
       pkgs.writeTextFile {
         inherit name;
@@ -66,15 +66,12 @@ in
     writeScriptBin = name: script:
       let
         script-txt = args:
-          pipe
-            run-script
-            xsh-write-script
-            "<|" (
-              args //
-              {
-                inherit name script;
-              }
-            );
+          do [
+            (args // { inherit name script; })
+            "||>" xsh-write-script
+            "|>" run-script
+          ]
+        ;
         write = args: pkgs.writeScriptBin name (script-txt args);
       in
         (write {}) //
