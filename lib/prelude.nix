@@ -7,7 +7,7 @@ let
         if builtins.isAttrs x then
           do.do [
             x
-            "|>" builtins.mapAttrs (k: v: ''${k} = ${toPretty v}'')
+            "$>" builtins.mapAttrs (k: v: ''${k} = ${toPretty v}'')
             "|>" builtins.concatStringsSep ","
             "|>" (res: ''{ ${res} }'')
           ]

@@ -30,14 +30,14 @@ let
       '';
       vars-txt = do [
         vars
-        "||>" builtins.mapAttrs mk-var
+        "$>" builtins.mapAttrs mk-var
         "|>" builtins.attrValues
         "|>" (vvs: [ "import json" ] ++ vvs)
         "|>" builtins.concatStringsSep "\n"
       ];
       sources-txt = do [
         sources
-        "||>" map (file: ''source "${file}"'')
+        "$>" map (file: ''source "${file}"'')
         "|>" builtins.concatStringsSep "\n"
       ];
     in
@@ -68,7 +68,7 @@ in
         script-txt = args:
           do [
             (args // { inherit name script; })
-            "||>" xsh-write-script
+            "$>" xsh-write-script
             "|>" run-script
           ]
         ;

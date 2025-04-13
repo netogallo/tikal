@@ -7,8 +7,8 @@ let
       operator = "|>";
       fn = f1: f2: arg: f2 (f1 arg);
     };
-    "||>" = {
-      operator = "||>";
+    "$>" = {
+      operator = "$>";
       precedence = 1;
       fn = x: f: f x;
     };
@@ -23,7 +23,7 @@ in
     demo = {
       "example 1" = rec {
         add = x: y: x + y;
-        expression = [ 8 "||>" add 9 "|>" add 5 ];
+        expression = [ 8 "$>" add 9 "|>" add 5 ];
         result = do expression;
       };
     };
