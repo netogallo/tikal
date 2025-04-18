@@ -2,11 +2,11 @@
 {
   script = xsh.write-script {
     name = "keys.xsh";
-    vars = { universe = universe; };
+    vars = { nahuales = universe.nahuales.names; };
     script = ''
       print("begin keys")
-      for k,v in universe.items():
-        print(f"{k} = {v}")
+      for nahual in nahuales:
+        print(f"nahual: {nahual}")
       print("end keys")
     '';
   };

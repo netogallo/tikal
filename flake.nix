@@ -17,17 +17,24 @@
         prelude = pkgs.callPackage ./lib/prelude.nix { };
         xonsh = pkgs.callPackage ./lib/xonsh.nix (prelude // { inherit nixpkgs; });
         callPackage = pkgs.newScope (prelude // xonsh // { inherit callPackage nixpkgs pkgs; }); 
-      in
-        {
-          lib = {
-            universe = spec: args: {
+        universe = spec: args:
+          let
+            instance = callPackage ./lib/universe.nix { universe = spec; };
+          in
+            {
               apps = {
-                sync = (callPackage ./lib/sync.nix { universe = callPackage spec {}; }).app;
+                sync = (callPackage ./lib/sync.nix { universe = instance; }).app;
                 xonsh = xonsh.xonsh-app;
               };
-            };
-          };
+            }
+        ;
+      in
+        {
           packages.default = pkgs.writeScript "tikal" "echo hello tikal!"; 
+          lib = {
+            inherit universe;
+          };
         }
-    );
+    )
+  ;
 }

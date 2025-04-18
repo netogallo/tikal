@@ -1,11 +1,13 @@
 { universe, writeScriptBin, docopts, callPackage, ... }:
 let
-  keys = callPackage ./sync/keys.nix { universe = universe.nahuales; };
+  keys = callPackage ./sync/keys.nix { inherit universe; };
   sync-script = ''
     from docopt import docopt
 
     doc = """
-    Usage: sync [--directory=<dir>]
+    Usage:
+      sync [--directory=<dir>]
+      sync yes
 
     Optionas:
       --directory=<dir>       The directory to use to store keys and files
