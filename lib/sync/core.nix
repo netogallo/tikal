@@ -17,7 +17,8 @@
 
         def secrets_dir(self):
           secrets = f"{self.__directory}/secrets"
-          mkdir -p secrets
+          print(f"{secrets}")
+          mkdir -p f"{secrets}"
           return secrets
     '';
   };
