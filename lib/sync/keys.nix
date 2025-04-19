@@ -4,10 +4,12 @@
     name = "keys.xsh";
     vars = { nahuales = universe.nahuales.names; };
     script = ''
-      print("begin keys")
-      for nahual in nahuales:
-        print(f"nahual: {nahual}")
-      print("end keys")
+
+      def init_keys(tikal):
+        secrets_dir = tikal.secrets_dir()
+
+        for nahual in nahuales:
+          print(f"mkdir -p {secrets_dir}/{nahual}")
     '';
   };
 }

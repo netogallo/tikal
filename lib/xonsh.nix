@@ -20,6 +20,20 @@ let
     , ...
     }:
     let
+      xonsh-globals = "__XONSH_GLOBALS_8e7d3fd1_8bdf_45c4_a27b_9cf320a2e5b4";
+      xonsh-init = ''
+        if '${xonsh-globals}' not in globals():
+          from types import SimpleNamespace
+          ${xonsh-globals} = SimpleNamespace()
+          ${xonsh-globals}.sources = set()
+
+      '';
+      source-file = file: ''
+        if "${file}" not in ${xonsh-globals}.sources:
+          source "${file}"
+          ${xonsh-globals}.sources.add("${file}")
+
+      '';
       save-var = name: value: pkgs.writeTextFile {
         inherit name;
         text = builtins.toJSON value;
@@ -37,13 +51,15 @@ let
       ];
       sources-txt = do [
         sources
-        "$>" map (file: ''source "${file}"'')
+        "$>" map source-file
         "|>" builtins.concatStringsSep "\n"
       ];
     in
       pkgs.writeTextFile {
         inherit name;
         text = ''
+        ${xonsh-init}
+
         ${sources-txt}
 
         ${vars-txt}
