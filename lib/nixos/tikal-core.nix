@@ -17,7 +17,6 @@ let
     decrypt_tikal_master_key() {
       while true; do
         read -s -p "Enter SSH key passphrase: " PASSPHRASE
-        echo "Your passphrase: $PASSPHRASE"
         ${ssh-keygen} -p -f "$TMP_KEY" -N "" -P "$PASSPHRASE"
         RESULT="$?"
 
