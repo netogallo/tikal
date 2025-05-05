@@ -1,9 +1,13 @@
-{ universe, writeScriptBin, docopts, callPackage, ... }:
+{ universe, writeScriptBin, docopts, callPackage, tor, ... }:
 let
+  tikal-tor = tor.overrideAttrs (new: old: {
+    patches = old.patches ++ [ ../patches/tor/0001-Command-line-option-to-pre-initialize-files.patch ];
+  });
   foundations = callPackage ./sync/foundations.nix { inherit universe; };
   core = callPackage ./sync/core.nix { inherit universe; };
   keys = callPackage ./sync/keys.nix { inherit universe; };
   sync-script = ''
+    ${tikal-tor}/bin/tor --help
     from docopt import docopt
 
     doc = """
