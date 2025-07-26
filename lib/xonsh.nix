@@ -3,10 +3,11 @@
   callPackage,
   pkgs,
   lib,
-  do,
+  tikal,
   ...
 }:
 let
+  inherit (tikal.prelude) do;
   xonsh =
     callPackage
       "${nixpkgs}/pkgs/by-name/xo/xonsh/package.nix"
@@ -125,7 +126,17 @@ let
         '';
       }
   ;
-    
+  makeXshScript = write:
+    let
+      script-txt = args: run-script (xsh-write-script args);
+    in
+      write script-txt
+  ;
+      
+  writeScript = makeXshScript (
+    write: name: script:
+      pkgs.writeScript name (write { inherit name script; })
+  );
 in
   {
     inherit xonsh;
@@ -136,6 +147,7 @@ in
     xsh = {
       write-script = xsh-write-script;
     };
+    inherit writeScript;
     writeScriptBin = name: script:
       let
         script-txt = args:

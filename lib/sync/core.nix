@@ -1,5 +1,6 @@
-{ xsh, universe, ... }:
+{ tikal, universe, ... }:
 let
+  inherit (tikal.xonsh) xsh;
   tikal-dir = universe.tikal-dir;
 in
   {
@@ -28,13 +29,29 @@ in
         class Tikal:
           def __init__(
             self,
-            loglevel = 0
+            loglevel = 0,
+            passwords = None
           ):
   
             self.__log = Logger(loglevel)
 
             self.__directory = $PWD
             self.__log.log_info(f"Working directory is: {self.__directory}")
+            self.__passwords = passwords
+
+          def get_password(self, name):
+            if self.__passwords is None:
+              return None
+
+            password = self.__passwords.get(name)
+
+            if password is None:
+              self.__log.log_warning(f"No password found for {name} in the supplied file. Using random.")
+              return None
+
+            self.__log.log_info(f"Found password for {name}")
+
+            return password
   
           @property
           def log(self):

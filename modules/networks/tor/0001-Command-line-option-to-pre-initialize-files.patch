@@ -1,0 +1,77 @@
+From bfc30bbbf2baa4e415e0aaa6736d963f746c4ed6 Mon Sep 17 00:00:00 2001
+From: Ernesto Rodriguez <connect@netowork.me>
+Date: Mon, 5 May 2025 17:25:21 +0100
+Subject: [PATCH] Command line option to pre-initialize files
+
+---
+ src/app/config/config.c           |  2 ++
+ src/app/config/tor_cmdline_mode.h |  1 +
+ src/app/main/main.c               | 13 +++++++++++++
+ 3 files changed, 16 insertions(+)
+
+diff --git a/src/app/config/config.c b/src/app/config/config.c
+index a10329c552..4e6278e709 100644
+--- a/src/app/config/config.c
++++ b/src/app/config/config.c
+@@ -2482,6 +2482,8 @@ static const struct {
+   { .name="--key-expiration",
+     .takes_argument=ARGUMENT_OPTIONAL,
+     .command=CMD_KEY_EXPIRATION },
++  { .name="--init-files",
++    .command=CMD_INIT_FILES },
+   { .name="--format",
+     .takes_argument=ARGUMENT_NECESSARY },
+   { .name="--newpass" },
+diff --git a/src/app/config/tor_cmdline_mode.h b/src/app/config/tor_cmdline_mode.h
+index 989050b1b1..0cdbc226e6 100644
+--- a/src/app/config/tor_cmdline_mode.h
++++ b/src/app/config/tor_cmdline_mode.h
+@@ -29,6 +29,7 @@ typedef enum {
+   CMD_RUN_UNITTESTS, /**< Special value: indicates that we have entered
+                       * the Tor code from the unit tests, not from the
+                       * regular Tor binary at all. */
++  CMD_INIT_FILES,
+ } tor_cmdline_mode_t;
+ 
+ #endif /* !defined(TOR_CMDLINE_MODE_H) */
+diff --git a/src/app/main/main.c b/src/app/main/main.c
+index 6d05bd1f5e..ea7161a11d 100644
+--- a/src/app/main/main.c
++++ b/src/app/main/main.c
+@@ -85,6 +85,8 @@
+ #include "feature/dirauth/authmode.h"
+ #include "feature/dirauth/shared_random.h"
+ 
++#include "feature/hs/hs_config.h"
++
+ #include "core/or/or_connection_st.h"
+ #include "core/or/port_cfg_st.h"
+ 
+@@ -825,6 +827,14 @@ do_dump_config(void)
+   return 0;
+ }
+ 
++static int
++do_init_fs(void)
++{
++    hs_config_service_all(get_options(), 0);
++    hs_service_load_all_keys();
++    return 0;
++}
++
+ static void
+ init_addrinfo(void)
+ {
+@@ -1403,6 +1413,9 @@ tor_run_main(const tor_main_configuration_t *tor_cfg)
+     break;
+   case CMD_RUN_UNITTESTS: /* only set by test.c */
+   case CMD_IMMEDIATE: /* Handled in config.c */
++  case CMD_INIT_FILES:
++    result = do_init_fs();
++    break;
+   default:
+     log_warn(LD_BUG,"Illegal command number %d: internal error.",
+              get_options()->command);
+-- 
+2.44.2
+

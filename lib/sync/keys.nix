@@ -1,6 +1,6 @@
-{ xsh, universe, openssh, ... }:
+{ universe, openssh, age, expect, tikal, ... }:
 let
-  _x = 42;
+  inherit (tikal.xonsh) xsh;
 in
 {
   script = xsh.write-script {
@@ -42,12 +42,31 @@ in
         ${openssh}/bin/ssh-keygen -t ed25519 -f f"{tikal_main}" -N ""
         mv f"{private_keys_dir}/{tikal_main_pub_base}" f"{public_keys_dir}/"
 
+        password = tikal.get_password(name)
+        if password is None:
+          password = base64.b64encode(randbytes(18)).decode()
+
         # Now we create the encrypted private key
-        password = base64.b64encode(randbytes(18)).decode()
         with open(tikal_main_pass, 'w') as pf:
           pf.write(password)
-        cp f"{tikal_main}" f"{tikal_main_enc}"
-        ssh-keygen -p -f f"{tikal_main_enc}" -N f"{password}"
+
+        age_script = f"""
+        spawn ${age}/bin/age --passphrase --armor -o "{tikal_main_enc}" "{tikal_main}"
+        expect "Enter passphrase"
+        send "{password}\r"
+        expect "Confirm passphrase"
+        send "{password}\r"
+        expect {{
+          "error" {{
+            expect eof
+            exit 1
+          }} eof {{
+            exit 0
+          }}
+        }}
+        """
+
+        ${expect}/bin/expect -c f"{age_script}"
 
       def init_keys(tikal):
         nahuales = ${vars.nahuales}
