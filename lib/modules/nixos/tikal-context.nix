@@ -1,8 +1,6 @@
-{ nahual, nahual-modules, lib, universe, tikal-secrets, ... }:
+{ nahual, nahual-modules, lib, ... }:
 let
-  tikal-context = {
-    inherit tikal-secrets;
-  };
+  tikal-context = {};
   mk-module = module:
     if lib.isFunction module
     then (args: module (tikal-context // args))

@@ -9,16 +9,24 @@
   outputs = { self, nixpkgs, utils }:
   let
     inherit (utils.lib) eachDefaultSystem;
+    flake = config:
+      eachDefaultSystem (
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+          tikal = pkgs.callPackage ./tikal.nix { inherit nixpkgs system config; };
+        in
+          {
+            packages.default = pkgs.writeScript "tikal" "echo hello tikal!";
+          }
+          // tikal
+      )
+    ;
+    defaults = {};
   in
-    eachDefaultSystem (
-      system:
-      let
-        pkgs = import nixpkgs { inherit system; };
-        tikal = pkgs.callPackage ./tikal.nix { inherit nixpkgs system; };
-      in
-        {
-          packages.default = pkgs.writeScript "tikal" "echo hello tikal!";
-        } // tikal
-    )
+    flake defaults
+    // {
+      override = overrides: flake (defaults // overrides);
+    }
   ;
 }

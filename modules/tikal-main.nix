@@ -2,6 +2,7 @@
 let
   inherit (lib) types mkOption;
   imports = [
+    ./universe/members.nix
     ./networks/tor.nix
   ];
   script-type = types.submodule {
@@ -41,9 +42,21 @@ in
         meant to add secrets into the various nahuales.
       '';
     };
+
+    tikal.build.public = mkOption {
+      type = types.attrsOf (types.attrsOf types.unspecified);
+      default = {};
+      description = ''
+        The purpose of this options is to collect public files which are meant
+        to be shared accross nahuales beloning to the same universe. In practice
+        this often means public keys. The structure of this object is meant to
+        be: "tikal.build.public.[<nahual>].[<secret name>] = <arbitrary value>".
+      '';
+    };
+
     tikal.build.modules = mkOption {
       type = types.attrsOf (types.listOf types.unspecified);
-      default = {};
+      default = lib.mapAttrs (_name: _value: []) config.nahuales;
       description = ''
         This option is meant to collect the list of modules that
         are to be included by each of the modules that define a
