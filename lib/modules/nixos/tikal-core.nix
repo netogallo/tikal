@@ -2,14 +2,14 @@
 let
   pkgs' = pkgs;
   lib' = lib;
+  log = tikal.prelude.log.add-context { file = ./tikal-core.nix; inherit nahual; };
   module = { lib, pkgs, ... }:
     let
       core-scope = lib'.makeScope pkgs'.newScope (self: {
-        inherit tikal nahual nahual-config nahual-modules universe;
-        tikal-foundations = self.callPackage ./tikal-foundations.nix {};
+        inherit pkgs lib tikal nahual nahual-config nahual-modules universe;
+        tikal-foundations = self.callPackage ../shared/tikal-foundations.nix {};
         tikal-context = self.callPackage ./tikal-context.nix {};
-        tikal-secrets = self.callPackage ./tikal-secrets.nix {};
-        tikal-log = self.callPackage ./tikal-log.nix {};
+        tikal-log = self.callPackage ../shared/tikal-log.nix {};
       });
       inherit (core-scope) tikal-context tikal-foundations;
       flake-attrs = universe.flake;
@@ -69,7 +69,7 @@ let
       {
         imports = tikal.prelude.trace tikal-context.modules tikal-context.modules;
         config = {
-          environment.etc = tikal.prelude.trace-value {
+          environment.etc = log.log-value "secret keys" {
             ${tikal-paths.relative.tikal-main-pub} = tikal-main-pub;
             ${tikal-paths.relative.tikal-main-enc} = tikal-main-enc;
           };

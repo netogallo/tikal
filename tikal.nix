@@ -1,13 +1,20 @@
 {
   nixpkgs,
   system,
-  lib
+  lib,
+  config ? {}
 }:
 let
+  tikal-config =
+    {
+      log-level = 1;
+    } //
+    config
+  ;
   scope = lib.makeScope pkgs.newScope (self:
     {
       pkgs = import nixpkgs { inherit system; };
-      inherit nixpkgs;
+      inherit nixpkgs tikal-config;
       tikal = {
         prelude = self.callPackage ./lib/prelude.nix {};
         xonsh = self.callPackage ./lib/xonsh.nix {};
@@ -16,6 +23,7 @@ let
     }
   );
   inherit (scope) callPackage pkgs xonsh;
+  log = scope.tikal.prelude.log.add-context { file = ./tikal.nix; };
 
   universe =
     spec:
@@ -63,7 +71,7 @@ let
       }
   ;
 in
-{
+log.log-info "done" {
   lib = {
     inherit universe;
   };

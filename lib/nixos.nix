@@ -35,7 +35,7 @@ let
     let
       core-module =
         callPackage
-        ./nixos/tikal-core.nix
+        ./modules/nixos/tikal-core.nix
         {
           inherit nahual nahual-config universe get-public-file;
           nahual-modules = universe.universe-module.module.config.tikal.build.modules.${nahual};

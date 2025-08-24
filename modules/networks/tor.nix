@@ -3,6 +3,8 @@
 , lib
 , tikal
 , pkgs
+, nahual-pkgs
+, universe-context
 , ...
 }:
 let
@@ -10,24 +12,19 @@ let
   inherit (tikal.sync) nahual-sync-script;
   inherit (lib) types mkIf mkOption;
   inherit (pkgs) gettext;
+  inherit (nahual-pkgs config.nahuales) tikal-secrets;
+  log = tikal.prelude.log.add-context { file = ./tor.nix; };
   tor-sync = pkgs.tor.overrideAttrs (new: old: {
     patches = old.patches ++ [ ./tor/0001-Command-line-option-to-pre-initialize-files.patch ];
   });
-  tor-network-module = name: config:
-    # This produces a nixos module which should
-    # do the following:
-    # 1. Enables tor
-    # 2. Creates a onion service
-    # 3. Exposes openssh on that onion service
-    # 4. Creates scripts to easily ssh into
-    #    other servers via tor
-    { tikal-secrets, ... }: 
+
+  tikal-onion-service = name: config:
     let
       torrc-init = pkgs.writeText "torrc" ''
         HiddenServiceDir $private
         HiddenServicePort 22 127.0.0.1:22
       '';
-      onion-services = tikal-secrets.secret-folders {
+      onion-secrets = tikal-secrets.${name}.secret-folders {
         tikal = {
           # The secrets builder will encrypt the contents of $out
           # before completing. Therefore they will not land on the
@@ -39,6 +36,8 @@ let
             echo $USER
             workdir=$(mktemp -d)
             cat "${torrc-init}" | private="$private" ${gettext}/bin/envsubst > "$workdir/torrc"
+            cat "$workdir/torrc"
+            echo "${tor-sync}"
             ${tor-sync}/bin/tor --init-files -d "$workdir" -f "$workdir/torrc"
 
             # Tor does not want exectue permissions on directory
@@ -54,10 +53,26 @@ let
           '';
         };
       };
+    in
+      log.log-value { nahual = name; } "Tor hidden service" onion-secrets
+  ;
+
+  tikal-onion-services = lib.mapAttrs tikal-onion-service config.nahuales;
+
+  tor-network-module = name: config:
+    # This produces a nixos module which should
+    # do the following:
+    # 1. Enables tor
+    # 2. Creates a onion service
+    # 3. Exposes openssh on that onion service
+    # 4. Creates scripts to easily ssh into
+    #    other servers via tor
+    let
+      onion-services = tikal-onion-services.${name};
       secrets = onion-services.secrets;
     in
     {
-      imports = tikal.prelude.trace.override { max-depth = 2; } ([ onion-services.module ]) ([ onion-services.module ]);
+      imports = [ onion-services.module ];
       config = {
         services.tor = {
           enable = true;

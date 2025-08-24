@@ -1,8 +1,8 @@
-{ pkgs, lib, tikal, nahual-config, tikal-foundations, tikal-log, universe, ... }:
+{ pkgs, lib, tikal, nahual-config, tikal-foundations, tikal-log, ... }:
 let
   inherit (tikal) prelude;
-  tikal-key = nahual-config.public.tikal-keys.tikal_main_pub;
-  tikal-private-key = nahual-config.public.tikal-keys.tikal_main_pub;
+  tikal-key = nahual-config.flake.public.tikal-keys.tikal_main_pub;
+  tikal-private-key = nahual-config.flake.public.tikal-keys.tikal_main_pub;
   tikal-paths = tikal-foundations.paths;
   log = tikal-log.log;
   create-secret-folder = { name, script }:
