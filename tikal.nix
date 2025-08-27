@@ -67,7 +67,7 @@ let
           sync = (sync-scope.callPackage ./lib/sync.nix { }).app;
           xonsh = xonsh.xonsh-app;
         };
-        nixosModules = scope.tikal.prelude.trace nixos.nixos-modules nixos.nixos-modules;
+        nixosModules = log.log-value "Nixos Modules" nixos.nixos-modules;
       }
   ;
 in

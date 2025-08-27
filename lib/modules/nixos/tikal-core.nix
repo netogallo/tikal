@@ -11,6 +11,7 @@ let
         tikal-context = self.callPackage ./tikal-context.nix {};
         tikal-log = self.callPackage ../shared/tikal-log.nix {};
         tikal-secrets = self.callPackage ../universe/tikal-secrets.nix {};
+        tikal-meta = self.callPackage ./tikal-meta.nix {};
       });
       inherit (core-scope) tikal-context tikal-foundations;
       flake-attrs = universe.flake;
@@ -69,7 +70,10 @@ let
     in
       {
         imports =
-          [ core-scope.tikal-secrets.secrets-module ]
+          with core-scope;
+          [ tikal-secrets.secrets-module
+            tikal-meta.module
+          ]
           ++ tikal.prelude.trace tikal-context.modules tikal-context.modules
         ;
         config = {

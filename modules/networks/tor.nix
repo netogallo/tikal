@@ -78,11 +78,11 @@ let
           progname = os.path.basename(__file__)
           doc = f"""
           Usage:
-            tor-ssh --input=<ssh-key> [-e] <nahual>
+            tor-ssh --input=<ssh-key> [--print] <nahual>
 
           Options:
             --input=<ssh-key> -i <ssh-key>      The ssh private key to use to connect
-            -e                                  Show the command rather than running it
+            --print -p                          Show the command rather than running it
             <nahual>                            The nahual to connect via ssh.
           """
 
@@ -91,14 +91,26 @@ let
           ssh_key = args['--input']
           hosts = ${vars.tor-hosts}
           host = hosts.get(nahual)
+          only_print = args['--print']
 
           if host is None:
             known_hosts = ", ".join(hosts.keys())
             raise Exception(f"The specified nahual '{nahual}' is not known. Known nahuales in the universe are: '{known_hosts}'")
 
           host = host.strip()
-          ${pkgs.openssh}/bin/ssh -o "ProxyCommand=${pkgs.netcat}/bin/nc -x 127.0.0.1:${builtins.toString tor-socks-port} -X 5 %h %p" -i f"{ssh_key}" f"nixos@{host}"
-          
+          cmd = [
+            "${pkgs.openssh}/bin/ssh",
+            "-o",
+            "ProxyCommand=${pkgs.netcat}/bin/nc -x 127.0.0.1:${builtins.toString tor-socks-port} -X 5 %h %p",
+            "-i",
+            f"{ssh_key}",
+            f"{nixos@{host}"
+          ]
+
+          if only_print:
+            print(" ".join(cmd))
+          else:
+            @(args)
         '';
       }
   ;
