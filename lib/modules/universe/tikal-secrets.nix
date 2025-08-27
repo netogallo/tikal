@@ -5,18 +5,50 @@ let
   tikal-private-key = nahual-config.flake.public.tikal-keys.tikal_main_pub;
   tikal-paths = tikal-foundations.paths;
   log = tikal-log.log;
-  create-secret-folder = { name, script }:
+  post-decrypt-script-name = "post_decrypt";
+  create-secret-folder = name: { script, private ? {} }:
     let
-      mkSecret = pkgs.writeScript "name" script;
+      mk-secret = pkgs.writeScript name script;
+
+      # If a specific user/group is supplied, the
+      # decrypted directory's ownership is changed
+      # to reflect said user/group combination.
+      set-ownership = { user ? null, group ? null }:
+        let
+          ownership =
+            if user != null && group != null
+            then [ "${user}:${group}" ]
+            else if user != null
+            then [ "${user}" ]
+            else if group != null
+            then [ ":${group}" ]
+            else []
+          ;
+          to-ownership-script = owner: ''
+            chown -R ${owner} "$private"
+            ${log} --tag=secrets -d "Setting ownership of ${name} to ${owner}" 
+          '';
+        in
+          prelude.do [
+            ownership
+            "$>" lib.map to-ownership-script
+            "|>" lib.concatStringsSep "\n"
+          ]
+      ;
+      post-decrypt = pkgs.writeScript "post-decrypt-${name}" ''
+        ${set-ownership private}
+        ${log} --tag=secrets -d "Finished running post-decrypt scripts for ${name}"
+      '';
     in
       pkgs.runCommandLocal name {} ''
         WORKDIR=$(mktemp -d)
         PUBLIC="$WORKDIR/public"
         PRIVATE="$WORKDIR/private"
-        out="$WORKDIR" public="$PUBLIC" private="$PRIVATE" ${mkSecret}
+        out="$WORKDIR" public="$PUBLIC" private="$PRIVATE" ${mk-secret}
         mkdir -p "$out"
         ${pkgs.gnutar}/bin/tar -cC "$PRIVATE" . | ${pkgs.age}/bin/age -R "${tikal-key}" -o "$out/private" 
         mv "$WORKDIR/public" "$out/public"
+        ln -s "${post-decrypt}" "$out/${post-decrypt-script-name}"
         rm -rf "$WORKDIR"
       ''
   ;
@@ -55,12 +87,25 @@ let
           if [ "$?" != 0 ]; then
             DIR=$(dirname "${tikal-paths.tikal-main}")
             ${log} --tag=secrets -e "Decryption failed for '${dest}' using key '${tikal-paths.tikal-main}'"
+          else
+            (cd "${dest}"; private="${dest}" ${store-path}/${post-decrypt-script-name})
           fi
           ''
       ;
       decrypt-scripts = prelude.do [
         secret-files
         "$>" lib.map mk-decrypt-folder-script
+        "|>" lib.concatStringsSep "\n"
+      ];
+      mk-post-decryption-script = script:
+        let
+          script-bin = pkgs.writeScriptBin "post-decryption" script;
+        in
+          "${script-bin}"
+      ;
+      post-decryption-scripts = prelude.do [
+        config.tikal.secrets.post-decryption-scripts
+        "$>" lib.map mk-post-decryption-script
         "|>" lib.concatStringsSep "\n"
       ];
     in
@@ -72,6 +117,18 @@ let
             List of encrypted files in the nix store that will be decrypted
             using the tikal master key on boot.
             '';
+            default = [];
+          };
+
+          tikal.secrets.post-decryption-scripts = mkOption {
+            type = types.listOf types.string;
+            description = ''
+            List of scripts to be run after all files have been
+            decrypted. Theese scripts are called as part of the
+            nixos "activationScripts", therefore ensure it is
+            idempotent.
+            '';
+            default = [];
           };
         };
 
@@ -86,6 +143,10 @@ let
               mkdir -p "${tikal-paths.store-secrets}"
               grep -q "${tikal-paths.store-secrets} ramfs" /proc/mounts ||
               mount -t ramfs none "${tikal-paths.store-secrets}" -o nodev,nosuid,mode=0751
+
+              # Set the permissions for the secret folder
+              chown -R root:users "${tikal-paths.store-secrets}"
+              chmod -R 755 "${tikal-paths.store-secrets}"
 
               # We destroy old secrets rather than mantaining "generations" as
               # done by agenix. The Agenix generations are transient and get reset
@@ -102,6 +163,7 @@ let
               fi
 
               ${decrypt-scripts}
+              ${post-decryption-scripts}
             '';
           };
         };
@@ -111,11 +173,10 @@ let
     let
       encrypted = prelude.do [
         folders
-        "$>" lib.mapAttrs (name: { script }: create-secret-folder { inherit name script; })
+        "$>" lib.mapAttrs create-secret-folder
         "|>" lib.mapAttrs (_: drv: "${drv}")
       ];
       module = {
-        imports = [ secrets-module ];
         config = {
           tikal.secrets.files = lib.attrValues encrypted;
         };
@@ -134,5 +195,5 @@ let
   ;
 in
 {
-  inherit secret-folders;
+  inherit secret-folders secrets-module;
 }

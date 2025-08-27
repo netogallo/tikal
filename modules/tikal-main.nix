@@ -4,6 +4,7 @@ let
   imports = [
     ./universe/members.nix
     ./networks/tor.nix
+    ./remote-access/ssh.nix
   ];
   script-type = types.submodule {
     options = {

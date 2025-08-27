@@ -10,6 +10,7 @@ let
         tikal-foundations = self.callPackage ../shared/tikal-foundations.nix {};
         tikal-context = self.callPackage ./tikal-context.nix {};
         tikal-log = self.callPackage ../shared/tikal-log.nix {};
+        tikal-secrets = self.callPackage ../universe/tikal-secrets.nix {};
       });
       inherit (core-scope) tikal-context tikal-foundations;
       flake-attrs = universe.flake;
@@ -67,7 +68,10 @@ let
       tikal-main-enc = get-public-file { path = tikal-keys.tikal_main_enc; mode = 600; };
     in
       {
-        imports = tikal.prelude.trace tikal-context.modules tikal-context.modules;
+        imports =
+          [ core-scope.tikal-secrets.secrets-module ]
+          ++ tikal.prelude.trace tikal-context.modules tikal-context.modules
+        ;
         config = {
           environment.etc = log.log-value "secret keys" {
             ${tikal-paths.relative.tikal-main-pub} = tikal-main-pub;
