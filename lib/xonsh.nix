@@ -24,7 +24,6 @@ let
     , script
     , vars ? {}
     , sources ? []
-    , ...
     }:
     let
       xonsh-globals = "__XONSH_GLOBALS_8e7d3fd1_8bdf_45c4_a27b_9cf320a2e5b4";
@@ -137,6 +136,10 @@ let
     write: name: script:
       pkgs.writeScript name (write { inherit name script; })
   );
+
+  write-script-bin = makeXshScript (
+    write: args@{ name, ... }: pkgs.writeScriptBin name (write args)
+  );
 in
   {
     inherit xonsh;
@@ -145,6 +148,7 @@ in
       program = "${xonsh}/bin/xonsh";
     };
     xsh = {
+      inherit write-script-bin;
       write-script = xsh-write-script;
     };
     inherit writeScript;

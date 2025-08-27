@@ -1,6 +1,7 @@
 { trace, log-level, lib }:
 let
   level = {
+    debug-verbose = 8;
     debug = 7;
     info = 6;
     warning = 5;
@@ -88,7 +89,7 @@ let
     log-warning = log-message.override { level = level.warning; };
     log-error = log-message.override { level = level.error; };
 
-    log-value = log-message.override { include-value = true; };
+    log-value = log-message.override { level = level.debug-verbose; include-value = true; };
 
     add-context = add-context:
       logger.override (logger-args // { context = context // add-context; })

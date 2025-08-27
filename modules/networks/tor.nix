@@ -58,6 +58,51 @@ let
   ;
 
   tikal-onion-services = lib.mapAttrs tikal-onion-service config.nahuales;
+  tor-socks-port = 39080;
+
+  to-tor-ssh = secrets:
+    let
+      tor-hosts =
+        lib.mapAttrs
+        (_: onion-service: lib.readFile "${onion-service.secrets.tikal.public}/hostname")
+        tikal-onion-services
+      ;
+    in
+      xsh.write-script-bin {
+        name = "tor-ssh";
+        vars = { inherit tor-hosts; };
+        script = { vars, ... }: ''
+          from docopt import docopt
+          import os
+          
+          progname = os.path.basename(__file__)
+          doc = f"""
+          Usage:
+            tor-ssh --input=<ssh-key> [-e] <nahual>
+
+          Options:
+            --input=<ssh-key> -i <ssh-key>      The ssh private key to use to connect
+            -e                                  Show the command rather than running it
+            <nahual>                            The nahual to connect via ssh.
+          """
+
+          args = docopt(doc)
+          nahual = args['<nahual>']
+          ssh_key = args['--input']
+          hosts = ${vars.tor-hosts}
+          host = hosts.get(nahual)
+
+          if host is None:
+            known_hosts = ", ".join(hosts.keys())
+            raise Exception(f"The specified nahual '{nahual}' is not known. Known nahuales in the universe are: '{known_hosts}'")
+
+          host = host.strip()
+          ${pkgs.openssh}/bin/ssh -o "ProxyCommand=${pkgs.netcat}/bin/nc -x 127.0.0.1:${builtins.toString tor-socks-port} -X 5 %h %p" -i f"{ssh_key}" f"nixos@{host}"
+          
+        '';
+      }
+  ;
+
 
   tor-network-module = name: config:
     # This produces a nixos module which should
@@ -70,12 +115,35 @@ let
     let
       onion-services = tikal-onion-services.${name};
       secrets = onion-services.secrets;
+      set-hostname = name': onion-service: 
+        ''
+          export TOR_${name'}=$(cat ${onion-service.secrets.tikal.public}/hostname)
+        ''
+      ;
+      tor-ssh = to-tor-ssh config;
+      set-hostnames = lib.mapAttrsFlatten set-hostname tikal-onion-services;
+      tikal-tor-package = pkgs.writeScriptBin "tikal-tor" ''
+        ${lib.concatStringsSep "\n" set-hostnames}
+      '';
     in
     {
       imports = [ onion-services.module ];
       config = {
+        environment.systemPackages = [
+          tikal-tor-package
+          (log.log-debug { nahual = name; } "tor-ssh: ${tor-ssh}" tor-ssh)
+        ];
         services.tor = {
           enable = true;
+          client = {
+            enable = true;
+            socksListenAddress = {
+              addr = "127.0.0.1";
+              port = tor-socks-port;
+              IsolateDestAddr = true;
+            };
+          };
+          
           relay.onionServices = {
             "tikal" = {
               secretKey = "${secrets.tikal.private}/hs_private_key";
