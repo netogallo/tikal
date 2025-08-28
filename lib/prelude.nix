@@ -6,6 +6,7 @@ let
       trace = self.callPackage ./prelude/trace.nix {};
       main = self.callPackage ./prelude/main.nix {};
       log = self.callPackage ./prelude/log.nix { inherit (tikal-config) log-level; };
+      template = self.callPackage ./prelude/template.nix {};
     }
   );
 in

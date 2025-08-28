@@ -2,18 +2,20 @@
 let
   inherit (config.tikal.meta) nahual tikal-dir;
   run-qemu =
-    pkgs.writeScript
-    "run-qemu"
-    ''
-      password_file="$PWD/${tikal-dir}/private/${nahual}/keys/id_tikal.pass"
-
-      if [ -f "$password_file" ]; then
-        password=$(cat "$password_file")
-        export QEMU_KERNEL_PARAMS="tikal.master-password=$password"
-      fi
-
-      ${config.system.build.vm}/bin/run-${config.system.name}-vm
-    ''
+    pkgs.writeShellApplication
+    {
+      name = "run-qemu";
+      text = 
+        ''
+        password_file="$PWD/${tikal-dir}/private/${nahual}/keys/id_tikal.pass"
+        if [ -f "$password_file" ]; then
+          password=$(cat "$password_file")
+          export QEMU_KERNEL_PARAMS="tikal.debug.master-key=$password"
+        fi
+        ${config.system.build.vm}/bin/run-${config.system.name}-vm
+        ''
+      ;
+    }
   ;
 in
   {

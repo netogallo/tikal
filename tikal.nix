@@ -74,5 +74,6 @@ in
 log.log-info "done" {
   lib = {
     inherit universe;
+    inherit (scope) tikal;
   };
 }

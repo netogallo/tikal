@@ -1,6 +1,7 @@
 { lib, nahual, universe, nahual-config, ... }:
 let
   inherit (universe.config) tikal-dir;
+  inherit (lib) mkOption types;
   module = { config, ... }: {
     options = {
       tikal.meta = {
