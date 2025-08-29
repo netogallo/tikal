@@ -1,13 +1,13 @@
 { pkgs, modulesPath, config, ... }:
 let
-  inherit (config.tikal.meta) nahual tikal-dir;
+  inherit (config.tikal.meta) nahual nahual-private;
   run-qemu =
     pkgs.writeShellApplication
     {
       name = "run-qemu";
       text = 
         ''
-        password_file="$PWD/${tikal-dir}/private/${nahual}/keys/id_tikal.pass"
+        password_file="$PWD/${nahual-private}/keys/id_tikal.pass"
         if [ -f "$password_file" ]; then
           password=$(cat "$password_file")
           export QEMU_KERNEL_PARAMS="tikal.debug.master-key=$password"

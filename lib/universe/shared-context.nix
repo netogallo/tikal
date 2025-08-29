@@ -18,8 +18,8 @@ let
       inherit (get-tikal-dirs ctx) private-dir public-dir;
     in
       rec {
-        private-root = "${private-dir}/${name}";
-        public-root = "${public-dir}/${name}";
+        private-root = "${private-dir}/nahuales/${name}";
+        public-root = "${public-dir}/nahuales/${name}";
         keys-root = "${private-root}/keys";
         public-keys-root = "${public-root}/keys";
       }

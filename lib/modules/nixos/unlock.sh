@@ -41,8 +41,6 @@ decrypt_tikal_master_key() {
     mkdir -p /run/keys/tikal
     mv "$TMP_KEY" /run/keys/tikal/id_tikal
     echo "Success! Writing key to ${tikal-paths.tikal-main}"
-    read -sr -p "Press enter to continue: " X
-    echo "$X"
     return 0
   else
     echo "Incorrect password was supplied. Try again"
@@ -66,6 +64,11 @@ decrypt_main() {
     read -sr -p "Enter SSH key passphrase: " PASSPHRASE
     decrypt_tikal_master_key "$PASSPHRASE"
     success="$?"
+
+    if [[ "$success" == "0" ]]; then
+      read -sr -p "Press enter to continue: " X
+      echo "$X"
+    fi
   done
 }
 
