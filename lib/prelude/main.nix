@@ -52,8 +52,30 @@ let
     in
       result
   ;
+  partition = tagger: values:
+    let
+      mapper = value: { ${tagger value} = value; };
+      joiner = item: items: [item] ++ items;
+    in
+      lib.foldAttrs joiner [] (map mapper values)
+  ;
+  fold-attrs-recursive-impl = path: acc: initial: attrs:
+    let
+      this-acc = state: key:
+        let
+          value = attrs.${key};
+          full-key = path ++ [key];
+        in
+          if lib.isAttrs value
+          then fold-attrs-recursive full-key acc state value
+          else acc state full-key value
+      ;
+    in
+      lib.fold this-acc initial (lib.attrNames attrs)
+  ;
+  fold-attrs-recursive = fold-attrs-recursive-impl [];
 in
   {
     inherit store-path-to-key store-path-to-python-identifier
-      drop-store-prefix is-prefix;
+      drop-store-prefix is-prefix partition fold-attrs-recurisve;
   }

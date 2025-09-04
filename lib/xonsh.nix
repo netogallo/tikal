@@ -7,17 +7,58 @@
   ...
 }:
 let
-  inherit (tikal.prelude) do;
+  inherit (tikal.prelude) do fold-attrs-recursive;
   xonsh =
     callPackage
       "${nixpkgs}/pkgs/by-name/xo/xonsh/package.nix"
       {
         extraPackages = pkgs: with pkgs; [ colorama docopt python-box ];
       }; 
-  run-script = script: ''
-    #!${pkgs.bash}/bin/bash
-    RAISE_SUBPROC_ERROR=True XONSH_SHOW_TRACEBACK=True ${xonsh}/bin/xonsh "${script}" $@
-  '';
+  run-script = { script, pythonpath ? [] }:
+    let
+      pythonpath-str =
+        if lib.length pythonpath == 0
+        then ""
+        else ''PYTHONPATH="${lib.concatStringsSep ":" pythonpath}"''
+      ;
+    in
+      ''
+      #!${pkgs.bash}/bin/bash
+      RAISE_SUBPROC_ERROR=True XONSH_SHOW_TRACEBACK=True ${pythonpath-str} ${xonsh}/bin/xonsh "${script}" $@
+      ''
+  ;
+  xsh-write-packages = { name, packages }:
+    let
+      acc-files = state: path: text:
+        let
+          name = lib.head (lib.takeEnd 1 path);
+          path = lib.concatStringsSep "/" (lib.dropEnd 1 path);
+        in
+          [ { ${path} = { ${name} = text; }; } ] ++ state
+      ;
+      acc-modules = item: acc: acc // item;
+      make-module-files = path: module':
+        let
+          module = { "__init__" = ""; } // module';
+          mapper = name: text:
+            pkgs.writeTextDir
+              "lib/python3/site-packages/${path}/${name}.py"
+              text
+          ;
+        in
+          lib.mapAttrsToList mapper module
+      ;
+    in
+      do [
+        packages
+        "$>" fold-attrs-recursive acc-files []
+        "|>" lib.foldAttrs acc-modules
+        "|>" lib.mapAttrsToList make-modules-files
+        "|>" lib.concatLists
+        "|>" (paths: pkgs.symlinkJoin { inherit name paths; }) 
+      ]
+  ;
+    
   xsh-write-script =
     {
       name
@@ -127,7 +168,7 @@ let
   ;
   makeXshScript = write:
     let
-      script-txt = args: run-script (xsh-write-script args);
+      script-txt = args: run-script { script = (xsh-write-script args); };
     in
       write script-txt
   ;
@@ -158,7 +199,7 @@ in
           do [
             (args // { inherit name script; })
             "$>" xsh-write-script
-            "|>" run-script
+            "|>" (script: run-script { inherit script; })
           ]
         ;
         write = args: pkgs.writeScriptBin name (script-txt args);
