@@ -8,12 +8,13 @@ let
   ];
   script-type = types.submodule {
     options = {
-      uid = mkOption {
-        type = types.string;
+      name = mkOption {
+        type = types.str;
         description = ''
-          A unique identifier for this script. This identifier should be derived
-          from a store path corresponding to the script as it is used to determine
-          if this script has been run.
+          A friendly name for the script. This value plays no role other than
+          becoming part of the name of the files generated to include this script.
+          In particular, the name of the python module which will be imported to
+          run the script.
         '';
       };
       text = mkOption {
@@ -22,9 +23,13 @@ let
           This type is a function that produces the script that is
           to be executed as part of the sync step. It will be given
           as an argument a context which contains:
-            - The tikal universe
+            - The Tikal universe
 
-          It can use that context to produce the script.
+          It can use that context to produce the script. The interpreter used
+          to run this script is xonsh (not bash). Furthermore, this script will
+          become a python module which must expose a function called "__main__".
+          The main sync script will import the module and call the "__main__"
+          function supplying the Tikal sync context object as argument.
         '';
       };
     };

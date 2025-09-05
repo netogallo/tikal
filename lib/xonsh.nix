@@ -8,6 +8,7 @@
 }:
 let
   inherit (tikal.prelude) do fold-attrs-recursive;
+  inherit (tikal.python) is-valid-python-identifier;
   xonsh =
     callPackage
       "${nixpkgs}/pkgs/by-name/xo/xonsh/package.nix"
@@ -29,12 +30,21 @@ let
   ;
   xsh-write-packages = { name, packages }:
     let
+      is-valid-python-path = path:
+        let
+          all-valid = lib.all is-valid-python-identifier path;
+        in
+          lib.length path > 0 && all-valid
+      ;
       acc-files = state: path: text:
         let
           name = lib.head (lib.takeEnd 1 path);
-          path = lib.concatStringsSep "/" (lib.dropEnd 1 path);
+          path-parts = lib.dropEnd 1 path;
+          path-str = lib.concatStringsSep "/" path-parts;
         in
-          [ { ${path} = { ${name} = text; }; } ] ++ state
+          if !(is-valid-python-path path-parts)
+          then throw "The python module definition contains the invalid python path '${path-str}'"
+          else [ { ${path-str} = { ${name} = text; }; } ] ++ state
       ;
       acc-modules = item: acc: acc // item;
       make-module-files = path: module':
@@ -48,15 +58,21 @@ let
         in
           lib.mapAttrsToList mapper module
       ;
+      site-packages =
+        do [
+          packages
+          "$>" fold-attrs-recursive acc-files []
+          "|>" lib.foldAttrs acc-modules {}
+          "|>" lib.mapAttrsToList make-modules-files
+          "|>" lib.concatLists
+          "|>" (paths: pkgs.symlinkJoin { inherit name paths; }) 
+        ]
+      ;
+      pythonpath = "${site-packages}/lib/python3/site-packages";
     in
-      do [
-        packages
-        "$>" fold-attrs-recursive acc-files []
-        "|>" lib.foldAttrs acc-modules
-        "|>" lib.mapAttrsToList make-modules-files
-        "|>" lib.concatLists
-        "|>" (paths: pkgs.symlinkJoin { inherit name paths; }) 
-      ]
+      {
+        inherit name site-packages pythonpath;
+      }
   ;
     
   xsh-write-script =
@@ -168,7 +184,9 @@ let
   ;
   makeXshScript = write:
     let
-      script-txt = args: run-script { script = (xsh-write-script args); };
+      script-txt =
+        args@{ pythonpath ? [], ... }:
+          run-script { inherit pythonpath; script = (xsh-write-script args); };
     in
       write script-txt
   ;

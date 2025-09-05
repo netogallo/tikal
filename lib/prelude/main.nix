@@ -33,9 +33,6 @@ let
             lib.replaceStrings ["${builtins.storeDir}/"] [""] store-path
       )))
   ;
-  store-path-to-python-identifier = inp:
-    "_" + lib.replaceStrings [ builtins.storeDir "." "-" ] [ "" "__" "_" ] inp
-  ;
   drop-store-prefix =
     makeOverridable
     ({ strict }: path:
@@ -76,6 +73,6 @@ let
   fold-attrs-recursive = fold-attrs-recursive-impl [];
 in
   {
-    inherit store-path-to-key store-path-to-python-identifier
-      drop-store-prefix is-prefix partition fold-attrs-recurisve;
+    inherit store-path-to-key drop-store-prefix is-prefix
+      partition fold-attrs-recurisve;
   }

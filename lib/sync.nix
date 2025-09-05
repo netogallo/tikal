@@ -1,10 +1,19 @@
 { universe, universe-module, docopts, tikal, lib, callPackage, ... }:
 let
   inherit (tikal.prelude) do;
-  inherit (tikal.xonsh) writeScriptBin;
+  inherit (tikal.xonsh.xsh) write-script-bin;
   foundations = callPackage ./sync/foundations.nix { };
   core = callPackage ./sync/core.nix { };
   keys = callPackage ./sync/keys.nix { };
+  to-sync-script-module = { name, script }:
+    let
+      module-name = "${name}_${builtins.hashString script}";
+    in
+      {
+        name = module-name;
+        module = { ${module-name} = { __init__ = script; };
+      }
+  ;
   modules-sync-scripts = do [
       modules-sync.scripts
       "$>" lib.map (script: script.text { inherit universe; })
@@ -53,16 +62,15 @@ let
 in
   rec {
     package =
-      writeScriptBin
-        "sync"
-        sync-script
-        {
-          sources = [
-            foundations.script
-            keys.script
-            core.script
-          ];
-        }
+      write-script-bin {
+        name = "sync";
+        script = sync-script;
+        sources = [
+          foundations.script
+          keys.script
+          core.script
+        ];
+      }
     ;
     app = {
       type = "app";
