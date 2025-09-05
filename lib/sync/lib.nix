@@ -46,13 +46,14 @@ in
             };
           in
             ''
-              tikal.log_info(f"Running sync hook '${name}'")
-              source ${wrapper-script}
+              def __main__(tikal):
+                tikal.log_info(f"Running sync hook '${name}'")
+                source ${wrapper-script}
             ''
         ;
       in
         {
-          inherit uid text;
+          inherit name text;
         }
     ;
   }

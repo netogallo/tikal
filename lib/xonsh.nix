@@ -28,13 +28,13 @@ let
       RAISE_SUBPROC_ERROR=True XONSH_SHOW_TRACEBACK=True ${pythonpath-str} ${xonsh}/bin/xonsh "${script}" $@
       ''
   ;
-  xsh-write-packages = { name, packages }:
+  write-packages = { name, packages }:
     let
       is-valid-python-path = path:
         let
           all-valid = lib.all is-valid-python-identifier path;
         in
-          lib.length path > 0 && all-valid
+          lib.length path > 1 && all-valid
       ;
       acc-files = state: path: text:
         let
@@ -42,8 +42,8 @@ let
           path-parts = lib.dropEnd 1 path;
           path-str = lib.concatStringsSep "/" path-parts;
         in
-          if !(is-valid-python-path path-parts)
-          then throw "The python module definition contains the invalid python path '${path-str}'"
+          if !(is-valid-python-path path)
+          then throw "The python module definition contains the invalid python path '${path-str}/${name}'"
           else [ { ${path-str} = { ${name} = text; }; } ] ++ state
       ;
       acc-modules = item: acc: acc // item;
@@ -207,7 +207,7 @@ in
       program = "${xonsh}/bin/xonsh";
     };
     xsh = {
-      inherit write-script-bin;
+      inherit write-script-bin write-packages;
       write-script = xsh-write-script;
     };
     inherit writeScript;
