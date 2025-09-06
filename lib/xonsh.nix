@@ -8,7 +8,7 @@
 }:
 let
   inherit (tikal.prelude) do fold-attrs-recursive;
-  inherit (tikal.python) is-valid-python-identifier;
+  inherit (tikal.prelude.python) is-valid-python-identifier;
   xonsh =
     callPackage
       "${nixpkgs}/pkgs/by-name/xo/xonsh/package.nix"
@@ -63,7 +63,7 @@ let
           packages
           "$>" fold-attrs-recursive acc-files []
           "|>" lib.foldAttrs acc-modules {}
-          "|>" lib.mapAttrsToList make-modules-files
+          "|>" lib.mapAttrsToList make-module-files
           "|>" lib.concatLists
           "|>" (paths: pkgs.symlinkJoin { inherit name paths; }) 
         ]

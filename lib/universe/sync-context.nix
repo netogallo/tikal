@@ -39,13 +39,13 @@ let
         (k: s: s.context.for-nahual name value)
         sync-scripts
       ;
-      public = lib.mapAttrs (k: s: s.public) nahual-sync-scripts-dirs;
-      private = lib.mapAttrs (k: s: s.private) nahual-sync-scripts-dirs;
+      #public = lib.mapAttrs (k: s: s.public) nahual-sync-scripts-dirs;
+      #private = lib.mapAttrs (k: s: s.private) nahual-sync-scripts-dirs;
     in
       base-ctx //
       {
-        public = base-ctx.public // public;
-        private = base-ctx.private // private;
+        public = base-ctx.public; # // public;
+        private = base-ctx.private; # // private;
       }
   ;
   sync-context = {
@@ -65,6 +65,8 @@ let
   ;
 in
   {
-    inherit config sync-scripts;
+    inherit config;
+    # Todo: should the sync scripts be part of the context?
+    # inherit sync-scripts;
   }
 

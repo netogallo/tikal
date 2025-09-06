@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ lib, string, ... }:
 let
   store-path-to-python-identifier = inp:
     "_" + lib.replaceStrings [ builtins.storeDir "." "-" ] [ "" "__" "_" ] inp
@@ -15,11 +15,11 @@ let
         valid-start = lib.stringToCharacters "${alpha}${other}";
       }
   ;
-  is-valid-python-identifier = string:
+  is-valid-python-identifier = identifier:
     let
-      head-valid = !(lib.elem (lib.strings.head string) valid-chars.valid-start);
-      body = lib.stringToCharacters (lib.strings.tail string);
-      body-valid = lib.all (c: !(lib.elem c valid-chars.valid-body)) body;
+      head-valid = !(lib.elem (string.head identifier) valid-chars.valid-start);
+      body = string.tail identifier;
+      body-valid = string.all (c: !(lib.elem c valid-chars.valid-body)) body;
     in
       head-valid && body-valid
   ;

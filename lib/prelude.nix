@@ -8,6 +8,7 @@ let
       log = self.callPackage ./prelude/log.nix { inherit (tikal-config) log-level; };
       template = self.callPackage ./prelude/template.nix {};
       python = self.callPackage ./prelude/python.nix {};
+      string = self.callPackage ./prelude/string.nix {};
     }
   );
 in

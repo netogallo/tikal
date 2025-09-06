@@ -34,7 +34,7 @@ let
   
   universe-module = {
     inherit module;
-    inherit (sync-scope.sync-context) sync-scripts;
+    # inherit (sync-scope.sync-context) sync-scripts;
   };
 in
   {

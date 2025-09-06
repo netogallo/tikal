@@ -7,11 +7,12 @@ let
   keys = callPackage ./sync/keys.nix { };
   to-sync-script-module = { name, text }:
     let
-      module-name = "${name}_${builtins.hashString script}";
+      __init__ = text { inherit universe; };
+      module-name = "${name}_${builtins.hashString "sha256" __init__}";
     in
       {
         name = module-name;
-        value = { __init__ = text { inherit universe; }; };
+        value = { inherit __init__; };
       }
   ;
   make-sync-packages-imports = names:
@@ -83,7 +84,7 @@ let
 in
   rec {
     package =
-      write-script-bin {
+      xsh.write-script-bin {
         name = "sync";
         script = sync-script;
         sources = [

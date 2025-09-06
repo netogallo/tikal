@@ -1,6 +1,7 @@
 { tikal, lib, ... }:
 let
-  inherit (tikal.prelude) do store-path-to-key store-path-to-python-identifier;
+  inherit (tikal.prelude) do store-path-to-key;
+  inherit (tikal.prelude.python) store-path-to-python-identifier;
   inherit (tikal.xonsh) xsh;
 in
   {
