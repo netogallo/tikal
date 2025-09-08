@@ -38,7 +38,16 @@ let
   trace-overridable = args: msg: value: builtins.trace (debug-print-overridable args msg) value;
   trace = makeOverridable trace-overridable debug-print-defaults;
   trace-value = value: trace value value;
+  throw-print = context: msg:
+    let
+      mk-sub = key: value: { key = "{${key}}"; value = debug-print value; };
+      subs = lib.mapAttrs' mk-sub context;
+      keys = lib.mapAttrsToList (k: _: k);
+      vals = lib.mapAttrsToList (_: v: v);
+    in
+      throw (lib.replaceStrings keys vals)
+  ;
 in
   {
-    inherit debug-print trace trace-value;
+    inherit debug-print trace trace-value throw-print;
   }

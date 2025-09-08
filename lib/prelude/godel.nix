@@ -11,31 +11,41 @@ let
     semantic-args = null;
     semantic-argc = null;
   };
-  types = {
-    plain = 0;
-    semantic-op = 1;
-  };
   acc =
+    { lift-to-semantic-op }:
     { result, stage, semantic-op, semantic-args, semantic-argc }@state:
     next:
     let
       is-semantic-op = lib.isAttrs next && lib.hasAttr "__argc" next;
-      is-plain = !is-semantic-op;
-      plain-case = { value = next; args = []; type = types.plain; };
-      plain-result = state // { result = result ++ [ plain-case ]; };
 
-      semantic-op-argc =
-        if next.__argc > 0
-        then next.__argc
-        else throw ''
-          Semantic operations must have at least 1 argument.
-          Found ${lib.toString next.__argc}.
-        ''
+      next-op =
+        if is-semantic-op next
+        then next
+        else lift-to-semantic-op next
       ;
+
+      semantic-op-argc = next-op.__argc;
+
+      semantic-op-init0 = {
+        value = next-op;
+        args = [];
+      };
+
+      semantic-op-init0-result =
+        lib.throwIfNot (stage = stages.init)
+        "Bug in the code, stage expected to be init"
+        (
+          state //
+          {
+            result = result ++ [ semantic-op-init0 ];
+          }
+        )
+      ;
+
       semantic-op-init-result =
         state //
         {
-          semantic-op = next; 
+          semantic-op = next-next-op;
           semantic-args = [];
           semantic-argc = semantic-op-argc;
           stage = stages.semantic-op-build;
@@ -52,7 +62,6 @@ let
       semantic-op-complete = {
         value = semantic-op next;
         args = semantic-args ++ [ next ];
-        type = types.semantic-op;
       };
       semantic-op-complete-result =
         state //
@@ -65,19 +74,17 @@ let
         }
       ;
     in
-
-      # If the state is initial and the value is not a
-      # semantic function, it just gets added to the
-      # array as is
-      if stage == stage.init && is-plain
-      then plain-result
-
+      # If the stage is init and we get a semantic operation
+      # which takes no argments, the semantic operation is
+      # absorbed into the results and the stage remains init
+      if stage == stages.init && semantic-op-argc == 0
+      then semantic-op-init0-result
       # If the state is initial and the value is a 
       # semantic function, we initialize the collection stage.
       # The number of arguments the semantic operation needs
       # is determined and subsequent elements in the array
       # become arguments of the semantic operation.
-      else if stage == stages.init
+      if stage == stages.init
       then semantic-op-init-result
 
       # If the state is semantic-op-build and the semantic argument
@@ -97,11 +104,10 @@ let
         reach this point as all possible alternatives should be
         covered by the if-statements above.
       ''
-    ;
-    
-  reduce = arr:
+  ;
+  reduce = config: arr:
     let
-      result = lib.foldl acc initial-state arr;
+      result = lib.foldl (acc config) initial-state arr;
     in
       if result.stage != stages.init
       then throw ''
@@ -110,7 +116,14 @@ let
       ''
       else result.result
   ;
+  semantic-op = { name, argc, op }:
+    {
+      __name = name;
+      __argc = argc;
+      __functor = self: op;
+    }
+  ;
 in
   {
-    inherit reduce types;
+    inherit reduce;
   }

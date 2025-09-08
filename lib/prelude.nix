@@ -9,6 +9,9 @@ let
       template = self.callPackage ./prelude/template.nix {};
       python = self.callPackage ./prelude/python.nix {};
       string = self.callPackage ./prelude/string.nix {};
+      godel = self.callPackage ./prelude/godel.nix {};
+      match = self.callPackage ./prelude/match.nix {};
+      test = self.callPackage ./prelude/test.nix { inherit (tikal-config) test-filters; };
     }
   );
 in

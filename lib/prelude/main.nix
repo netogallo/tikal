@@ -1,4 +1,4 @@
-{ callPackage, lib, ... }:
+{ callPackage, test, lib, ... }:
 let
   inherit (lib.customisation) makeOverridable;
   strings = lib.strings;
@@ -56,23 +56,9 @@ let
     in
       lib.foldAttrs joiner [] (map mapper values)
   ;
-  fold-attrs-recursive-impl = path: acc: initial: attrs:
-    let
-      this-acc = key: state:
-        let
-          value = attrs.${key};
-          full-key = path ++ [key];
-        in
-          if lib.isAttrs value
-          then fold-attrs-recursive-impl full-key acc state value
-          else acc state full-key value
-      ;
-    in
-      lib.fold this-acc initial (lib.attrNames attrs)
-  ;
-  fold-attrs-recursive = fold-attrs-recursive-impl [];
 in
   {
     inherit store-path-to-key drop-store-prefix is-prefix
-      partition fold-attrs-recursive;
+      partition;
+    inherit (test) fold-attrs-recursive;
   }
