@@ -9,6 +9,7 @@
 let
   inherit (tikal.prelude) do fold-attrs-recursive;
   inherit (tikal.prelude.python) is-valid-python-identifier;
+  inherit (tikal.prelude) list;
   xonsh =
     callPackage
       "${nixpkgs}/pkgs/by-name/xo/xonsh/package.nix"
@@ -38,8 +39,8 @@ let
       ;
       acc-files = state: path: text:
         let
-          name = lib.head (lib.takeEnd 1 path);
-          path-parts = lib.dropEnd 1 path;
+          name = lib.head (list.take-end 1 path);
+          path-parts = list.drop-end 1 path;
           path-str = lib.concatStringsSep "/" path-parts;
         in
           if !(is-valid-python-path path)

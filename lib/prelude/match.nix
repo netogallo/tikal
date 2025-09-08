@@ -28,14 +28,14 @@ let
         'cath-all' function.
       ''
   ;
-  semantic-op-fn-arags = fn: godel.semantic-op {
+  semantic-op-fn-args = fn: godel.semantic-op {
     name = "match set pattern";
     argc = 0;
     op = expr: apply-args fn expr;
   };
   lift-to-semantic-op = value:
     let
-      fn-args = builtins.functionArgs value;
+      fn-args = lib.attrNames (builtins.functionArgs value);
     in
       if lib.isFunction value && lib.length fn-args > 0
       then semantic-op-fn-args value

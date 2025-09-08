@@ -2,7 +2,7 @@
 let
   logger = log.add-context { file = ./test.nix; };
   inherit (lib) strings;
-  glob-to-re = strings.replace [ "." "*" ] [ "\\." ".*" ];
+  glob-to-re = strings.replaceStrings [ "." "*" ] [ "\\." ".*" ];
   match-by-re = re: str: strings.match re str != null;
   process-filter = filter:
     match filter [
@@ -47,6 +47,8 @@ let
 
   are-tests-enabled = test-filters != null && lib.length test-filters > 0;
 
+  result-sep = "\n\n";
+
   _assert = { name }:
     let
       run = outcome: message:
@@ -70,8 +72,12 @@ let
       ;
     in
       {
-        __functor: self: test: run test "Expeted expression to be 'true'.";
+        __functor = self: test: run test "Expeted expression to be 'true'.";
         eq = a: b: run (a == b) "Expected '${trace.debug-print a}', got '${trace.debug-print b}'";
+        all = values: {
+          success = lib.all (r: r.success) values;
+          message = lib.concatStringsSep result-sep (map (r: r.message) values);
+        };
       }
   ;
   test-context = name: {
@@ -109,7 +115,7 @@ let
       test-list = fold-attrs-recursive test-acc [] tests;
       test-results = map run-test test-list;
       outcome = lib.all (r: r.success) test-results;
-      outcome-msg = lib.concatStringsSep "\n\n" (map (r: r.message) test-results);
+      outcome-msg = lib.concatStringsSep result-sep (map (r: r.message) test-results);
     in
       if outcome
       then logger.log-debug outcome-msg module
@@ -117,7 +123,7 @@ let
   ;
 
   with-tests = module: tests:
-    if are-test-enabled
+    if are-tests-enabled
     then with-tests-enabled module tests
     else module
   ;

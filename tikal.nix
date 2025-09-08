@@ -8,6 +8,7 @@ let
   tikal-config =
     {
       log-level = 1;
+      test-filters = null;
     } //
     config
   ;

@@ -1,4 +1,4 @@
-{ lib, ... }
+{ lib }:
 let
   stages = {
     init = 0;
@@ -6,7 +6,7 @@ let
   };
   initial-state = {
     result = [];
-    state = states.init;
+    stage = stages.init;
     semantic-op = null;
     semantic-args = null;
     semantic-argc = null;
@@ -19,7 +19,7 @@ let
       is-semantic-op = lib.isAttrs next && lib.hasAttr "__argc" next;
 
       next-op =
-        if is-semantic-op next
+        if is-semantic-op
         then next
         else lift-to-semantic-op next
       ;
@@ -32,7 +32,7 @@ let
       };
 
       semantic-op-init0-result =
-        lib.throwIfNot (stage = stages.init)
+        lib.throwIfNot (stage == stages.init)
         "Bug in the code, stage expected to be init"
         (
           state //
@@ -45,7 +45,7 @@ let
       semantic-op-init-result =
         state //
         {
-          semantic-op = next-next-op;
+          semantic-op = next-op;
           semantic-args = [];
           semantic-argc = semantic-op-argc;
           stage = stages.semantic-op-build;
@@ -84,7 +84,7 @@ let
       # The number of arguments the semantic operation needs
       # is determined and subsequent elements in the array
       # become arguments of the semantic operation.
-      if stage == stages.init
+      else if stage == stages.init
       then semantic-op-init-result
 
       # If the state is semantic-op-build and the semantic argument
@@ -125,5 +125,5 @@ let
   ;
 in
   {
-    inherit reduce;
+    inherit reduce semantic-op;
   }
