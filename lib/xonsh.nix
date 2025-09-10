@@ -187,7 +187,11 @@ let
     let
       script-txt =
         args@{ pythonpath ? [], ... }:
-          run-script { inherit pythonpath; script = (xsh-write-script args); };
+          run-script {
+            inherit pythonpath;
+            script = xsh-write-script (lib.attrsets.removeAttrs args [ "pythonpath" ]);
+          }
+      ;
     in
       write script-txt
   ;

@@ -1,7 +1,7 @@
 { tikal, lib, ... }:
 let
   inherit (tikal.prelude) do store-path-to-key;
-  inherit (tikal.prelude.python) store-path-to-python-identifier;
+  inherit (tikal.prelude.python) is-valid-python-identifier store-path-to-python-identifier;
   inherit (tikal.xonsh) xsh;
 in
   {
@@ -12,8 +12,13 @@ in
       , each-nahual
       }:
       let
+        valid-name =
+          if is-valid-python-identifier name
+          then name
+          else throw "The script name must be a valid python module name. Got '${name}'"
+        ;
         each-nahual-script = xsh.write-script {
-          name = "${name}.xsh";
+          name = "${valid-name}.xsh";
           vars = {};
           script = { vars, ... }: ''
             all_nahuales = universe.nahuales
@@ -48,13 +53,14 @@ in
           in
             ''
               def __main__(tikal):
-                tikal.log_info(f"Running sync hook '${name}'")
+                tikal.log_info(f"Running sync hook '${valid-name}'")
                 source ${wrapper-script}
             ''
         ;
       in
         {
-          inherit name text;
+          name = valid-name;
+          inherit text;
         }
     ;
   }

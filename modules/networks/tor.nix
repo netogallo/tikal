@@ -170,7 +170,7 @@ let
   tor-modules = name: config: lib.map (mod: mod name config) [ tor-network-module ];
 
   sync-script = nahual-sync-script {
-    name = "tikal-host-onion-service";
+    name = "tikal_host_onion_service";
     description = ''
     This script does the following:
       1. Create the public keys for the onion services

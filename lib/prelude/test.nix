@@ -78,6 +78,8 @@ let
           success = lib.all (r: r.success) values;
           message = lib.concatStringsSep result-sep (map (r: r.message) values);
         };
+        true = cond: run (lib.isBool cond && cond) "Expected expression to be 'true', got '${trace.debug-print cond}'";
+        false = cond: run (lib.isBool cond && !cond) "Expected expression to be 'false', got '${trace.debug-print cond}'";
       }
   ;
   test-context = name: {

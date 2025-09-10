@@ -19,7 +19,7 @@ let
 
         The input was ${store-path}
       '';
-      alphabet = lib.stringToCharacters "abcdefghijklmnopqrstuvwxyz1234567890-.";
+      alphabet = lib.stringToCharacters "abcdefghijklmnopqrstuvwxyz1234567890-._";
       # This function replaces the 'bad' characters that come from a string produced
       # from a store path and repalces them with 'good' characters that come from
       # the string defined above. Nix seems to be doing some sort of dodgey tagging of values
