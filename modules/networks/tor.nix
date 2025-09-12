@@ -183,8 +183,9 @@ let
          in each of the images.
     '';
     each-nahual = {
-      build-step = ''
-        ${tor-sync}/bin/tor --init-files -d f"{out}"
+      build-step = { vars, ... }: with vars; ''
+        # ${tor-sync}/bin/tor --init-files -d f"{out}"
+        print(f"Tor sync script {${nahual_name}}")
       '';
     };
   };

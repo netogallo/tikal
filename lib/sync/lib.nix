@@ -3,64 +3,120 @@ let
   inherit (tikal.prelude) do store-path-to-key;
   inherit (tikal.prelude.python) is-valid-python-identifier store-path-to-python-identifier;
   inherit (tikal.xonsh) xsh;
-in
-  {
-    nahual-sync-script =
-      {
-        name
-      , description
-      , each-nahual
-      }:
-      let
-        valid-name =
-          if is-valid-python-identifier name
-          then name
-          else throw "The script name must be a valid python module name. Got '${name}'"
-        ;
-        each-nahual-script = xsh.write-script {
-          name = "${valid-name}.xsh";
-          vars = {};
-          script = { vars, ... }: ''
+  inherit (tikal) test;
+  nahual-sync-script =
+    {
+      name
+    , description
+    , each-nahual
+    }:
+    let
+      valid-name =
+        if is-valid-python-identifier name
+        then name
+        else throw "The script name must be a valid python module name. Got '${name}'"
+      ;
+      each-nahual-vars = {
+        nahual-name = "nahual_name";
+        nahual-spec = "nahual_spec";
+      };
+      each-nahual-text = each-nahual { vars = each-nahual-vers; };
+      each-nahual-script = xsh.write-script {
+        name = "each.xsh";
+        vars = {};
+        script = { vars, ... }: with each-nahual-vers; ''
+          def __main__(tikal, universe, quine_uid):
             all_nahuales = universe.nahuales
-            for nahual_name, nahual_spec in all_nahuales.items():
-              for client, client_spec in nahual_spec.items():
-                #public_spec = client_spec.public[quine_uid]
-                #private_spec = client_spec.private[quine_uid]
-                #msg = f"private dir {private_spec.root}, public dir {public_spec.root}"
-                #print(msg)
-                print(f"done {quine_uid}")
-          '';
-        };
-        uid = store-path-to-key "${each-nahual-script}";
-        text = { universe, ...}:
-          let
-            fn-name = store-path-to-python-identifier uid;
-            wrapper-script = xsh.write-script {
-              name = "${name}-wrapper.xsh";
-              vars = { inherit universe; };
-              script = { vars, ... }: ''
-                def ${fn-name}(universe):
-                  global quine_uid
-                  quine_uid = "${uid}"
-                  # todo:
-                  # Check if tikal folder already exits. Skip if so.
-                  # Otherwise, create the folder
-                  source ${each-nahual-script}
+            for ${nahual-name}, ${nahual-spec} in all_nahuales.items():
+              tikal.log_info(f"begin (${valid-name}, {quine_uid}, {${nahual-name})")
+              ${each-nahual-text}
+              tikal.log_info(f"done (${valid-name}, {quine_uid}, {${nahual-name}")
+        '';
+      };
+      uid = store-path-to-key "${each-nahual-script}";
+      packages = { universe, ...}:
+        let
+          main-script = xsh.write-script {
+            name = "main.xsh";
+            vars = { inherit universe; };
+            script = { vars, ... }: ''
 
-                ${fn-name}(${vars.universe})
-              '';
-            };
-          in
-            ''
               def __main__(tikal):
-                tikal.log_info(f"Running sync hook '${valid-name}'")
-                source ${wrapper-script}
+                universe = ${vars.universe}
+                quine_uid
+                quine_uid = "${uid}"
+                # todo:
+                # Check if tikal folder already exits. Skip if so.
+                # Otherwise, create the folder
+                import ./each
+                each.__main__(tikal, universe quine_uid)
+            '';
+          };
+          __init__ =
             ''
-        ;
+            def __main__(tikal):
+              tikal.log_info(f"Running sync hook '${valid-name}'")
+              import .main
+              main.__main__(tikal)
+            ''
+          ;
+        in
+          xsh.write-packages {
+            name = valid-name;
+            packages = {
+              ${valid-name} = {
+                inherit __init__ main;
+                each = each-nahual-script;
+              };
+            };
+          }
+      ;
+    in
+      {
+        name = valid-name;
+        inherit packages;
+      }
+  ;
+in
+  test.with-tests
+  {
+    inherit nahual-sync-script;
+  }
+  {
+    tikal.sync =
+      let
+        universe = {
+          nahuales = {
+            test-nahual-1 = {};
+            test-nahual-2 = {};
+          };
+        };
+        sync-script-args = {
+          name = "test_sync_script";
+          description = "Sync script for unit testing";
+          each-nahual = { vars, ... }: with vars;
+            ''
+            ''
+          ;
+        };
       in
-        {
-          name = valid-name;
-          inherit text;
+        xsh.test {
+          name = "sync_tests";
+          pythonpath = [
+            (nahual-sync-script {}).packages.pythonpath
+          ];
+          script =
+            ''
+            import unittest
+
+            class TestSync(unittest.TestCase):
+          
+              def test_runs_sync_script(self):
+                import test_sync_script
+                test_sync_script.__main__(None)
+            ''
+          ;
         }
-    ;
+      ;
+    };
   }

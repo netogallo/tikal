@@ -9,7 +9,7 @@
 let
   inherit (tikal.prelude) do fold-attrs-recursive;
   inherit (tikal.prelude.python) is-valid-python-identifier;
-  inherit (tikal.prelude) list;
+  inherit (tikal.prelude) list path;
   xonsh =
     callPackage
       "${nixpkgs}/pkgs/by-name/xo/xonsh/package.nix"
@@ -48,16 +48,23 @@ let
           else [ { ${path-str} = { ${name} = text; }; } ] ++ state
       ;
       acc-modules = item: acc: acc // item;
+      make-module-file-content = path: name: input:
+        let
+          output =
+            if lib.isPath text && lib.pathIsRegularFile text
+            then { text = lib.readFile input; extension = path.extension-of-checked [ "xsh" "py" ] input; }
+            else { text = input; extension = "py"; }
+          ;
+        in
+          pkgs.writeTextDir
+            "lib/python3/site-packages/${path}/${name}.${output.extension}"
+            output.text
+      ;
       make-module-files = path: module':
         let
           module = { "__init__" = ""; } // module';
-          mapper = name: text:
-            pkgs.writeTextDir
-              "lib/python3/site-packages/${path}/${name}.py"
-              text
-          ;
         in
-          lib.mapAttrsToList mapper module
+          lib.mapAttrsToList (make-module-file path) module
       ;
       site-packages =
         do [
@@ -204,6 +211,60 @@ let
   write-script-bin = makeXshScript (
     write: args@{ name, ... }: pkgs.writeScriptBin name (write args)
   );
+  test-xsh = { name, pythonpath ? [], script }:
+    let
+      script-txt =
+        if lib.isFunction script
+        then script {}
+        else script
+      ;
+      test-script = write-script-bin {
+        inherit name;
+        script = ''
+        ${script-txt}
+
+        import unittest
+        import json
+
+        class CollectingResult(unittest.TextTestResult):
+
+          def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.__results = {}
+
+          def addSuccess(self, test):
+            super().addSuccess(test)
+            self.__results[test] = { 'success' = True, message = "" }
+
+          def addError(self, test, err):
+            super().addError(test, err)
+            self.__results[test] = {'success' = False, message = err }
+
+          def save_tikal(self):
+            result = $TIKAL_XSH_TESTS_RESULTS
+            with open(result, 'w') as fp:
+              json.dump(self.__results, fp) 
+
+        class CollectingRunner(unittest.TextTestRunner):
+	        def _makeResult(self):
+		        collect = CollectingResult(self.stream, self.descriptions, self.verbosity)
+            collect.save_tikal()
+            return collect
+
+        unittest.main(testRunner=CollectingRunner)
+        ''
+      ;
+      };
+      test-outcome = pkgs.runCommand "${name}-outcome" ''
+        TIKAL_XSH_TESTS_RESULTS=$out ${test-script}
+      '';
+      tests = lib.importJSON test-outcome;
+      mk-test = name: { success, message }: { _assert, ... }:
+        _assert.true success message
+      ;
+    in
+      lib.mapAttrs mk-test tests;
+  ;
 in
   {
     inherit xonsh;
@@ -214,6 +275,7 @@ in
     xsh = {
       inherit write-script-bin write-packages;
       write-script = xsh-write-script;
+      test = test-xsh;
     };
     inherit writeScript;
     writeScriptBin = name: script:

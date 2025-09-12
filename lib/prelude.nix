@@ -13,6 +13,7 @@ let
       match = self.callPackage ./prelude/match.nix {};
       test = self.callPackage ./prelude/test.nix { inherit (tikal-config) test-filters; };
       list = self.callPackage ./prelude/list.nix {};
+      path = self.callPackage ./prelude/path.nix {};
     }
   );
 in

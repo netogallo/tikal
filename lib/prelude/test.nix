@@ -80,6 +80,7 @@ let
         };
         true = cond: run (lib.isBool cond && cond) "Expected expression to be 'true', got '${trace.debug-print cond}'";
         false = cond: run (lib.isBool cond && !cond) "Expected expression to be 'false', got '${trace.debug-print cond}'";
+        throws = op: run (!(builtins.tryEval op).success) "Expected expression to throw, got '${trace.debug-print op}'";
       }
   ;
   test-context = name: {
