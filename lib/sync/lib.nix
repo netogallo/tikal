@@ -1,9 +1,9 @@
-{ tikal, lib, ... }:
+{ tikal, pkgs, lib, ... }:
 let
   inherit (tikal.prelude) do store-path-to-key;
   inherit (tikal.prelude.python) is-valid-python-identifier store-path-to-python-identifier;
   inherit (tikal.xonsh) xsh;
-  inherit (tikal) test;
+  inherit (tikal.prelude) test;
   nahual-sync-script =
     {
       name
@@ -20,11 +20,11 @@ let
         nahual-name = "nahual_name";
         nahual-spec = "nahual_spec";
       };
-      each-nahual-text = each-nahual { vars = each-nahual-vers; };
+      each-nahual-text = each-nahual { vars = each-nahual-vars; };
       each-nahual-script = xsh.write-script {
         name = "each.xsh";
         vars = {};
-        script = { vars, ... }: with each-nahual-vers; ''
+        script = { vars, ... }: with each-nahual-vars; ''
           def __main__(tikal, universe, quine_uid):
             all_nahuales = universe.nahuales
             for ${nahual-name}, ${nahual-spec} in all_nahuales.items():
@@ -36,7 +36,7 @@ let
       uid = store-path-to-key "${each-nahual-script}";
       packages = { universe, ...}:
         let
-          main-script = xsh.write-script {
+          main = xsh.write-script {
             name = "main.xsh";
             vars = { inherit universe; };
             script = { vars, ... }: ''
@@ -48,7 +48,7 @@ let
                 # todo:
                 # Check if tikal folder already exits. Skip if so.
                 # Otherwise, create the folder
-                import ./each
+                from ${valid-name} import each
                 each.__main__(tikal, universe quine_uid)
             '';
           };
@@ -56,7 +56,7 @@ let
             ''
             def __main__(tikal):
               tikal.log_info(f"Running sync hook '${valid-name}'")
-              import .main
+              from ${valid-name} import main
               main.__main__(tikal)
             ''
           ;
@@ -99,14 +99,17 @@ in
             ''
           ;
         };
+        packages =
+          (nahual-sync-script sync-script-args).packages
+          { inherit universe; }
+        ;
       in
         xsh.test {
           name = "sync_tests";
           pythonpath = [
-            (nahual-sync-script {}).packages.pythonpath
+            packages.pythonpath
           ];
-          script =
-            ''
+          script = ''
             import unittest
 
             class TestSync(unittest.TestCase):
@@ -117,6 +120,5 @@ in
             ''
           ;
         }
-      ;
-    };
+    ;
   }

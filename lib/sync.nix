@@ -5,14 +5,13 @@ let
   foundations = callPackage ./sync/foundations.nix { };
   core = callPackage ./sync/core.nix { };
   keys = callPackage ./sync/keys.nix { };
-  to-sync-script-module = { name, text }:
+  to-sync-script-module = { name, packages }:
     let
-      __init__ = text { inherit universe; };
-      module-name = "${name}_${builtins.hashString "sha256" __init__}";
+      package-instance = packages { inherit universe; };
     in
       {
-        name = module-name;
-        value = { inherit __init__; };
+        inherit name;
+        value = package-instance.pythonpath;
       }
   ;
   make-sync-packages-imports = names:
@@ -25,22 +24,23 @@ let
     in
       lib.concatStringsSep "\n" (lib.map mk-import names)
   ;
-  make-sync-packages = packages:
+  make-sync-scripts = packages:
     let
       package-names = lib.attrNames packages;
       package-imports = make-sync-packages-imports package-names;
+      package-paths = lib.attrValues packages;
     in
       {
-        inherit package-names package-imports;
-        packages = xsh.write-packages { name = "sync_modules"; inherit packages; };
+        inherit package-names package-imports package-paths;
       }
   ;
   modules-sync-scripts = do [
       modules-sync.scripts
       "$>" lib.map to-sync-script-module
       "|>" lib.listToAttrs
-      "|>" make-sync-packages
+      "|>" make-sync-scripts
   ];
+
   modules-sync = universe-module.module.config.tikal.sync;
   # modules-sync-scripts = "${modules-sync-scripts}";
   sync-script = ''
@@ -92,7 +92,7 @@ in
           keys.script
           core.script
         ];
-        pythonpath = [ modules-sync-scripts.packages.pythonpath ];
+        pythonpath = modules-sync-scripts.package-paths;
       }
     ;
     app = {

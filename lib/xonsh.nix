@@ -26,7 +26,10 @@ let
     in
       ''
       #!${pkgs.bash}/bin/bash
-      RAISE_SUBPROC_ERROR=True XONSH_SHOW_TRACEBACK=True ${pythonpath-str} ${xonsh}/bin/xonsh "${script}" $@
+      touch xonshrc
+      XONSHRC="$PWD/xonshrc" HOME="$PWD" RAISE_SUBPROC_ERROR=True XONSH_SHOW_TRACEBACK=True ${pythonpath-str} ${xonsh}/bin/xonsh "${script}" $@
+
+      exit $?
       ''
   ;
   write-packages = { name, packages }:
@@ -51,7 +54,7 @@ let
       make-module-file-content = path: name: input:
         let
           output =
-            if lib.isPath text && lib.pathIsRegularFile text
+            if lib.isPath input && lib.pathIsRegularFile input
             then { text = lib.readFile input; extension = path.extension-of-checked [ "xsh" "py" ] input; }
             else { text = input; extension = "py"; }
           ;
@@ -64,7 +67,7 @@ let
         let
           module = { "__init__" = ""; } // module';
         in
-          lib.mapAttrsToList (make-module-file path) module
+          lib.mapAttrsToList (make-module-file-content path) module
       ;
       site-packages =
         do [
@@ -218,52 +221,63 @@ let
         then script {}
         else script
       ;
-      test-script = write-script-bin {
-        inherit name;
-        script = ''
-        ${script-txt}
-
+      test-packages = write-packages {
+        name = "tests";
+        packages = {
+          tikal_xsh_tests = {
+            tests = script-txt;
+          };
+        };
+      };
+      test-support = ''
         import unittest
         import json
-
+        import tikal_xsh_tests.tests
+        
         class CollectingResult(unittest.TextTestResult):
-
+        
           def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.__results = {}
-
+        
           def addSuccess(self, test):
             super().addSuccess(test)
-            self.__results[test] = { 'success' = True, message = "" }
-
+            self.__results[test] = { 'success': True, 'message': "" }
+        
           def addError(self, test, err):
             super().addError(test, err)
-            self.__results[test] = {'success' = False, message = err }
-
+            self.__results[test] = {'success': False, 'message': err }
+        
           def save_tikal(self):
             result = $TIKAL_XSH_TESTS_RESULTS
             with open(result, 'w') as fp:
               json.dump(self.__results, fp) 
-
+        
         class CollectingRunner(unittest.TextTestRunner):
-	        def _makeResult(self):
-		        collect = CollectingResult(self.stream, self.descriptions, self.verbosity)
+          def _makeResult(self):
+            collect = CollectingResult(self.stream, self.descriptions, self.verbosity)
             collect.save_tikal()
             return collect
-
-        unittest.main(testRunner=CollectingRunner)
+        
+        unittest.main(module='tikal_xsh_tests.tests', testRunner=CollectingRunner)
         ''
       ;
+      test-script = write-script-bin {
+        inherit name;
+        script = lib.concatStringsSep "\n" [
+          test-support
+        ];
+        pythonpath = [ test-packages.pythonpath ] ++ pythonpath;
       };
-      test-outcome = pkgs.runCommand "${name}-outcome" ''
-        TIKAL_XSH_TESTS_RESULTS=$out ${test-script}
+      test-outcome = pkgs.runCommand "${name}-outcome" {} ''
+        TIKAL_XSH_TESTS_RESULTS=$out ${test-script}/bin/${name} tikal_xsh_tests.tests.*
       '';
       tests = lib.importJSON test-outcome;
       mk-test = name: { success, message }: { _assert, ... }:
         _assert.true success message
       ;
     in
-      lib.mapAttrs mk-test tests;
+      lib.mapAttrs mk-test tests
   ;
 in
   {

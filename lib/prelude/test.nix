@@ -26,24 +26,36 @@ let
   ;
   filters = map process-filter test-filters;
 
+  fold-attrs-recursive-config = { recurse-derivations = false; };
+
   # defined here as this module uses the function
   # and test should avoid having too much dependencies
   # as it allows other modules to be tested.
-  fold-attrs-recursive-impl = path: acc: initial: attrs:
+  fold-attrs-recursive-impl = config@{ recurse-derivations }: path: acc: initial: attrs:
     let
       this-acc = key: state:
         let
           value = attrs.${key};
           full-key = path ++ [key];
+          should-recurse =
+            # Only recurse derivations if enabled
+            (lib.isDerivation value && recurse-derivations && lib.isAttrs value)
+
+            # Attribute Sets which are not derivations are always recursed
+            || (!lib.isDerivation value && lib.isAttrs value)
+          ;
         in
-          if lib.isAttrs value
-          then fold-attrs-recursive-impl full-key acc state value
+          if should-recurse
+          then fold-attrs-recursive-impl config full-key acc state value
           else acc state full-key value
       ;
     in
       lib.fold this-acc initial (lib.attrNames attrs)
   ;
-  fold-attrs-recursive = fold-attrs-recursive-impl [];
+  fold-attrs-recursive =
+    lib.makeOverridable (config: fold-attrs-recursive-impl config [])
+    fold-attrs-recursive-config
+  ;
 
   are-tests-enabled = test-filters != null && lib.length test-filters > 0;
 
