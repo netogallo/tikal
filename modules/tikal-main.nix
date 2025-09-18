@@ -1,3 +1,10 @@
+# This is a very low-level module which contains the minimum number of attributes needed
+# to construct a Tikal universe with the corresponding sync scripts. In general, all Tikal
+# modules will reduce to the attribtues defined in this module, which are then used
+# to generate the sync scripts and the Tikal universe. Users are not expected to
+# directly define/set options defined in this model. Rather, other modules will define
+# high level options for users to use. These modules will translate the high level
+# options into the options defined in this module.
 { config, lib, ... }:
 let
   inherit (lib) types mkOption;
@@ -17,19 +24,26 @@ let
           run the script.
         '';
       };
-      text = mkOption {
+      packages = mkOption {
         type = types.anything;
         description = ''
-          This type is a function that produces the script that is
-          to be executed as part of the sync step. It will be given
-          as an argument a context which contains:
-            - The Tikal universe
+          This is the low-level attribute used to define hooks that are executed
+          during the Tikal sync stage. This attribute is expected to be a function
+          that accepts the following context as arguments:
 
-          It can use that context to produce the script. The interpreter used
-          to run this script is xonsh (not bash). Furthermore, this script will
-          become a python module which must expose a function called "__main__".
-          The main sync script will import the module and call the "__main__"
-          function supplying the Tikal sync context object as argument.
+            - The Tikal universe
+          
+          and produces a sync hook definition. A sync hook is a xonsh package
+          definition (see 'write-packages' of lib/xonsh.nix) which should contain
+          a package identified by the "name" attribute above. The package must
+          export a function called "__main__" which will be called with the
+          following arguments:
+
+            - The Tikal sync context
+
+          Generally speaking, one should not directly write this argument. See
+          the "lib/sync/lib.nix" module for helper functions which provide
+          simplified interfaces to add sync hooks.
         '';
       };
     };

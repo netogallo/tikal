@@ -30,7 +30,7 @@ let
             for ${nahual-name}, ${nahual-spec} in all_nahuales.items():
               tikal.log_info(f"begin (${valid-name}, {quine_uid}, {${nahual-name}})")
               ${each-nahual-text}
-              tikal.log_info(f"done (${valid-name}, {quine_uid}, {${nahual-spec}}")
+              tikal.log_info(f"done (${valid-name}, {quine_uid}, {${nahual-spec}})")
         '';
       };
       uid = store-path-to-key "${each-nahual-script}";
