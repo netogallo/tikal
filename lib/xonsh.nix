@@ -51,16 +51,16 @@ let
           else [ { ${path-str} = { ${name} = text; }; } ] ++ state
       ;
       acc-modules = item: acc: acc // item;
-      make-module-file-content = path: name: input:
+      make-module-file-content = python-script-path: name: input:
         let
           output =
-            if lib.isPath input && lib.pathIsRegularFile input
+            if path.is-file-reference input
             then { text = lib.readFile input; extension = path.extension-of-checked [ "xsh" "py" ] input; }
             else { text = input; extension = "py"; }
           ;
         in
           pkgs.writeTextDir
-            "lib/python3/site-packages/${path}/${name}.${output.extension}"
+            "lib/python3/site-packages/${python-script-path}/${name}.${output.extension}"
             output.text
       ;
       make-module-files = path: module':

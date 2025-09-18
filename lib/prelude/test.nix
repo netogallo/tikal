@@ -125,7 +125,7 @@ let
         in
           if has-match
           then state ++ [ { name = test-name; inherit test; } ]
-          else state
+          else builtins.trace "skipping: ${test-name}" state
       ;
       test-list = fold-attrs-recursive test-acc [] tests;
       test-results = map run-test test-list;

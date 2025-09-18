@@ -17,8 +17,8 @@ let
         else throw "The script name must be a valid python module name. Got '${name}'"
       ;
       each-nahual-vars = {
-        nahual-name = "nahual_name";
-        nahual-spec = "nahual_spec";
+        nahual-name = "_nahual_name_5d1ab2d6";
+        nahual-spec = "_nahual_spec_5d1ab2d6";
       };
       each-nahual-text = each-nahual { vars = each-nahual-vars; };
       each-nahual-script = xsh.write-script {
@@ -28,9 +28,9 @@ let
           def __main__(tikal, universe, quine_uid):
             all_nahuales = universe.nahuales
             for ${nahual-name}, ${nahual-spec} in all_nahuales.items():
-              tikal.log_info(f"begin (${valid-name}, {quine_uid}, {${nahual-name})")
+              tikal.log_info(f"begin (${valid-name}, {quine_uid}, {${nahual-name}})")
               ${each-nahual-text}
-              tikal.log_info(f"done (${valid-name}, {quine_uid}, {${nahual-name}")
+              tikal.log_info(f"done (${valid-name}, {quine_uid}, {${nahual-spec}}")
         '';
       };
       uid = store-path-to-key "${each-nahual-script}";
@@ -43,13 +43,12 @@ let
 
               def __main__(tikal):
                 universe = ${vars.universe}
-                quine_uid
                 quine_uid = "${uid}"
                 # todo:
                 # Check if tikal folder already exits. Skip if so.
                 # Otherwise, create the folder
                 from ${valid-name} import each
-                each.__main__(tikal, universe quine_uid)
+                each.__main__(tikal, universe, quine_uid)
             '';
           };
           __init__ =
@@ -77,6 +76,14 @@ let
         inherit packages;
       }
   ;
+  sync-test = xsh.write-packages {
+    name = "sync_test";
+    packages = {
+      sync_test = {
+        __init__ = ./sync_test/__init__.py;
+      };
+    };
+  };
 in
   test.with-tests
   {
@@ -108,15 +115,17 @@ in
           name = "sync_tests";
           pythonpath = [
             packages.pythonpath
+            sync-test.pythonpath
           ];
           script = ''
             import unittest
+            from sync_test import TikalMock
 
             class TestSync(unittest.TestCase):
           
               def test_runs_sync_script(self):
                 import test_sync_script
-                test_sync_script.__main__(None)
+                test_sync_script.__main__(TikalMock())
             ''
           ;
         }
