@@ -15,9 +15,14 @@ class TikalMock:
     """
 
 
-    def __init__(self):
+    def __init__(self, test_case):
         super().__init__()
         self.__logs = []
+        self.__test_case = test_case
+
+    @property
+    def test_case(self):
+        return self.__test_case
 
     def log_info(self, message: str) -> None:
         self.__logs.append({'level': LogLevel.Info, 'message': message})

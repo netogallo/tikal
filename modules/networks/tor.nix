@@ -182,10 +182,10 @@ let
          can be built and the private keys will be available
          in each of the images.
     '';
-    each-nahual = { vars, ... }: with vars; ''
-      # ${tor-sync}/bin/tor --init-files -d f"{out}"
+    each-nahual = { vars, ... }: with vars;
+      ''
       print(f"Tor sync script {${nahual-name}}")
-    '';
+      '';
   };
   tor-cfg = config.networks.tor;
 in

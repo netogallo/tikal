@@ -233,20 +233,38 @@ let
         import unittest
         import json
         import tikal_xsh_tests.tests
+        import traceback
         
         class CollectingResult(unittest.TextTestResult):
         
           def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.__results = {}
+
+          def __addResult(self, test, err = None):
+            if err is None:
+              success = True
+              message = ""
+            else:
+              success = False
+              (ty,val,tb) = err
+              tb_str = "".join(traceback.format_tb(tb))
+              message = f"{val}\n{ty}\n{tb_str}".upper()
+
+            key = f"{test.id()}"
+            self.__results[key] = { 'success': success, 'message': message }
         
           def addSuccess(self, test):
             super().addSuccess(test)
-            self.__results[test] = { 'success': True, 'message': "" }
+            self.__addResult(test)
         
           def addError(self, test, err):
             super().addError(test, err)
-            self.__results[test] = {'success': False, 'message': err }
+            self.__addResult(test, err)
+
+          def addFailure(self, test, err):
+            super().addFailure(test, err)
+            self.__addResult(test, err)
         
           def save_tikal(self):
             result = $TIKAL_XSH_TESTS_RESULTS
@@ -255,9 +273,12 @@ let
         
         class CollectingRunner(unittest.TextTestRunner):
           def _makeResult(self):
-            collect = CollectingResult(self.stream, self.descriptions, self.verbosity)
-            collect.save_tikal()
-            return collect
+            return CollectingResult(self.stream, self.descriptions, self.verbosity)
+
+          def run(self, tests):
+            result = super().run(tests)
+            result.save_tikal()
+            return result
         
         unittest.main(module='tikal_xsh_tests.tests', testRunner=CollectingRunner)
         ''
@@ -270,14 +291,16 @@ let
         pythonpath = [ test-packages.pythonpath ] ++ pythonpath;
       };
       test-outcome = pkgs.runCommand "${name}-outcome" {} ''
-        TIKAL_XSH_TESTS_RESULTS=$out ${test-script}/bin/${name} tikal_xsh_tests.tests.*
+        set +e
+        TIKAL_XSH_TESTS_RESULTS=$out ${test-script}/bin/${name}
+        exit 0
       '';
       tests = lib.importJSON test-outcome;
       mk-test = name: { success, message }: { _assert, ... }:
-        _assert.true success message
+        _assert.check success message
       ;
     in
-      lib.mapAttrs mk-test tests
+      tikal.prelude.trace-value ((lib.mapAttrs mk-test tests) // { "dummy test" = { _assert, ... }: _assert.true false; })
   ;
 in
   {

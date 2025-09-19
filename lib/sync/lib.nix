@@ -17,20 +17,33 @@ let
         else throw "The script name must be a valid python module name. Got '${name}'"
       ;
       each-nahual-vars = {
-        nahual-name = "_nahual_name_5d1ab2d6";
-        nahual-spec = "_nahual_spec_5d1ab2d6";
+        nahual-name = "$_nahual_name_5d1ab2d6";
+        nahual-spec = "$_nahual_spec_5d1ab2d6";
+        tikal-context = "$_tikal_5d1ab2d6";
       };
-      each-nahual-text = each-nahual { vars = each-nahual-vars; };
+      each-nahual-text =
+        let
+          script-file =
+            pkgs.writeText
+            "each_item.xsh"
+            (each-nahual { vars = each-nahual-vars; })
+          ;
+        in
+          "source ${script-file}"
+      ;
       each-nahual-script = xsh.write-script {
         name = "each.xsh";
         vars = {};
         script = { vars, ... }: with each-nahual-vars; ''
           def __main__(tikal, universe, quine_uid):
             all_nahuales = universe.nahuales
-            for ${nahual-name}, ${nahual-spec} in all_nahuales.items():
-              tikal.log_info(f"begin (${valid-name}, {quine_uid}, {${nahual-name}})")
+            for name, spec in all_nahuales.items():
+              ${tikal-context}=tikal
+              ${nahual-spec}=spec
+              ${nahual-name}=name
+              tikal.log_info(f"begin ({name}, {quine_uid})")
               ${each-nahual-text}
-              tikal.log_info(f"done (${valid-name}, {quine_uid}, {${nahual-spec}})")
+              ${tikal-context}.log_info(f"done ({name}, {quine_uid})")
         '';
       };
       uid = store-path-to-key "${each-nahual-script}";
@@ -103,6 +116,10 @@ in
           description = "Sync script for unit testing";
           each-nahual = { vars, ... }: with vars;
             ''
+            tikal=${tikal-context}
+            nahual_name=${nahual-name}
+            test_case = tikal.test_case
+            test_case.assertTrue(nahual_name is not None, "Cannot access the nahual name")
             ''
           ;
         };
@@ -125,7 +142,7 @@ in
           
               def test_runs_sync_script(self):
                 import test_sync_script
-                test_sync_script.__main__(TikalMock())
+                test_sync_script.__main__(TikalMock(self))
             ''
           ;
         }
