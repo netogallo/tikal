@@ -184,7 +184,8 @@ let
     '';
     each-nahual = { vars, ... }: with vars;
       ''
-      print(f"Tor sync script {${nahual-name}}")
+      name=${nahual-name}
+      print(f"Tor sync script {name}")
       '';
   };
   tor-cfg = config.networks.tor;

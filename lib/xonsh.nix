@@ -249,7 +249,7 @@ let
               success = False
               (ty,val,tb) = err
               tb_str = "".join(traceback.format_tb(tb))
-              message = f"{val}\n{ty}\n{tb_str}".upper()
+              message = f"{val}\n{ty}\n{tb_str}"
 
             key = f"{test.id()}"
             self.__results[key] = { 'success': success, 'message': message }
@@ -295,12 +295,17 @@ let
         TIKAL_XSH_TESTS_RESULTS=$out ${test-script}/bin/${name}
         exit 0
       '';
-      tests = lib.importJSON test-outcome;
+      tests = do [
+        test-outcome
+        "$>" builtins.readFile
+        "|>" builtins.unsafeDiscardStringContext
+        "|>" builtins.fromJSON
+      ];
       mk-test = name: { success, message }: { _assert, ... }:
         _assert.check success message
       ;
     in
-      tikal.prelude.trace-value ((lib.mapAttrs mk-test tests) // { "dummy test" = { _assert, ... }: _assert.true false; })
+      lib.mapAttrs mk-test tests
   ;
 in
   {
