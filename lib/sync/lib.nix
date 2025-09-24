@@ -8,7 +8,7 @@ let
     {
       name
     , description
-    , each-nahual
+    , each-nahual ? null
     }:
     let
       valid-name =
@@ -31,10 +31,16 @@ let
         in
           "source ${script-file}"
       ;
-      each-nahual-script = xsh.write-script {
-        name = "each.xsh";
-        vars = {};
-        script = { vars, ... }: with each-nahual-vars; ''
+      each-nahual-script-main = { ... }:
+        if each-nahual == null
+        then
+          ''
+          def __main__(tikal, universe, quine_uid):
+            tikal.log_info("${name}: No 'each-nahual' script provided.")
+          ''
+        else
+          with each-nahual-vars;
+          ''
           def __main__(tikal, universe, quine_uid):
             all_nahuales = universe.nahuales
             for name, spec in all_nahuales.items():
@@ -44,7 +50,12 @@ let
               tikal.log_info(f"begin ({name}, {quine_uid})")
               ${each-nahual-text}
               ${tikal-context}.log_info(f"done ({name}, {quine_uid})")
-        '';
+          ''
+      ;
+      each-nahual-script = xsh.write-script {
+        name = "each.xsh";
+        vars = {};
+        script = each-nahual-script-main;
       };
       uid = store-path-to-key "${each-nahual-script}";
       packages = { universe, ...}:

@@ -1,4 +1,4 @@
-{ tikal, ... }:
+{ tikal, lib, ... }:
 let
   __doc__ = ''
   Tikal relies a lot on "impure" derivations. Although theese derivations are discouraged
@@ -23,6 +23,7 @@ let
   the "sync" script.
   '';
   inherit (tikal.prelude) do;
+  inherit (lib) types mkOption;
   lockdir-path = "public/lock";
   lockfile-path = "${lockdir-path}/lockfile.json";
   lockstore-path = "${lockdir-path}/store";
@@ -38,7 +39,73 @@ let
 
       ]
   ;
+  to-locked-config = { key, derive }:
+    let
+      hashed-key = hash-key key;
+    in
+      {
+        ${hashed-key} = { inherit derive; };
+      }
+  ;
+  create-locked-derivations = args-any:
+    let
+      args =
+        if lib.isAttrs args-any
+        then [ args-any ]
+        else args-any
+      ;
+      items = do [
+        args-any
+        "$>" map to-locked-config
+        "|>" lib.foldAttrs (arg: state: state // arg) {}
+      ];
+    in
+      {
+        config.tikal.store-lock.items = items;
+      }
+  ;
+  module = { .. }:
+    let
+      x = 5;
+    in
+      {
+        options.tikal.store-lock = {
+          items = mkOption {
+            default = {};
+            type = types.attrsOf types.unspecified;
+            description = ''
+              This option defines the derivations that get locked by the "sync" script. Tikal has the
+              ability to describe many "impure" aspects of the universe as a derivation. One notable
+              example is "tikal-secrets", which are used to derive cryptographic keys that are then
+              encrypted into the nix store. Obviously, one gets a different output every time the
+              derivation is run, which in turn can mess up the universe. In this exmaple, if new
+              keys are derived upon every update, access might be disrrupted.
+
+              To address this issue, Tikal can "lock" store paths. This consists of defining an
+              identifier which is unrelated to a store path. The sync script then checks if this
+              identifier is found in the lock store directory of the tikal config. If missing,
+              the derivation gets copied and asociated with the lock key. If present, then this
+              is ignored.
+
+              The locked store paths can then be commited to a git repository, allowing them to be
+              shared as Tikal will always encrypt any secrets that it generates.
+
+              This option allows defining locked store paths. It is an attribute set where keys
+              are the unique (and stable) identiifer that are given to a derivation and the value
+              is an attribute set with the field "derive" which describes how the value is to
+              be generated if missing.
+
+              It is recommended that the "create-locked-derivations" is used to generate a module
+              that specifies locked derivations instead of directly setting this option.
+            '';
+          };
+        };
+      }
+  ;
 in
   {
-    inherit __doc__ lockdir-path lockfile-path lockstore-path hash-key;
+    lib = {
+      inherit create-locked-derivations;
+    };
+    inherit __doc__ module;
   }

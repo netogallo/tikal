@@ -2,7 +2,6 @@
 let
   inherit (tikal) prelude;
   tikal-key = nahual-config.flake.public.tikal-keys.tikal_main_pub;
-  tikal-private-key = nahual-config.flake.public.tikal-keys.tikal_main_pub;
   tikal-paths = tikal-foundations.paths;
   log = tikal-log.log;
   post-decrypt-script-name = "post_decrypt";
