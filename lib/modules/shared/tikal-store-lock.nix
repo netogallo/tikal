@@ -23,7 +23,9 @@ let
   the "sync" script.
   '';
   inherit (tikal.prelude) do;
-  inherit (lib) types mkOption;
+  inherit (tikal.sync) nahual-sync-script;
+  inherit (tikal.template) template;
+  inherit (lib) types mkIf mkOption;
   lockdir-path = "public/lock";
   lockfile-path = "${lockdir-path}/lockfile.json";
   lockstore-path = "${lockdir-path}/store";
@@ -64,9 +66,28 @@ let
         config.tikal.store-lock.items = items;
       }
   ;
-  module = { .. }:
+  create-sync-script = locks:
     let
       x = 5;
+    in
+      nahual-sync-script {
+        name = "tikal_store_lock";
+        description = ''
+          This sync script is responsible for creating locked store paths inside the Tikal configuration.
+          A locked store path is simply a copy of a regular store path into the public part of the Tikal
+          configuration. A store lockfile identifies each of the paths with a unique and stable key.
+          The idea is that the output of various, normally impure, derivations can be shared accross
+          different machines.
+        '';
+        vars = { inherit locks; };
+        script = { vars, ... }: template ./tikal-store-lock/main.xsh vars;
+      }
+  ;
+  module = { options, .. }:
+    let
+      store-lock = options.tikal.store-lock;
+      is-enabled = lib.length (lib.attrNames store-lock) > 0;
+      sync-script = create-sync-script store-lock.items;
     in
       {
         options.tikal.store-lock = {
@@ -99,6 +120,11 @@ let
               that specifies locked derivations instead of directly setting this option.
             '';
           };
+        };
+
+        config = mkIf is-enabled {
+          tikal.sync.scripts [
+          ];
         };
       }
   ;

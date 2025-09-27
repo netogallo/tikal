@@ -59,7 +59,7 @@ let
     get-config
     {
       to-nahual = to-sync-nahual;
-      context = sync-context;
+      context = get-tikal-dirs sync-context;
       nahuales = universe-module.config.nahuales;
     }
   ;

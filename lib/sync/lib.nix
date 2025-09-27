@@ -4,11 +4,14 @@ let
   inherit (tikal.prelude.python) is-valid-python-identifier store-path-to-python-identifier;
   inherit (tikal.xonsh) xsh;
   inherit (tikal.prelude) test;
+  inherit (tikal.prelude.attrs) merge-disjoint;
   nahual-sync-script =
     {
       name
     , description
     , each-nahual ? null
+    , script ? null
+    , vars ? = {}
     }:
     let
       valid-name =
@@ -20,13 +23,22 @@ let
         nahual-name = "$_nahual_name_5d1ab2d6";
         nahual-spec = "$_nahual_spec_5d1ab2d6";
         tikal-context = "$_tikal_5d1ab2d6";
+        tikal-universe = "$_tikal_universe_5d1ab2d6";
       };
+      make-user-script = globals: script: { vars, ... }@args':
+        let
+          args = args' // { vars = merge-disjoint vars globals; };
+        in
+          script args
+      ;
       each-nahual-text =
         let
           script-file =
-            pkgs.writeText
-            "each_item.xsh"
-            (each-nahual { vars = each-nahual-vars; })
+            xsh.write-script {
+              name = "each_item.xhs";
+              inherit vars;
+              script = make-user-script each-nahual-vars each-nahual;
+            }
           ;
         in
           "source ${script-file}"
@@ -45,6 +57,7 @@ let
             all_nahuales = universe.nahuales
             for name, spec in all_nahuales.items():
               ${tikal-context}=tikal
+              ${tikal-universe}=universe
               ${nahual-spec}=spec
               ${nahual-name}=name
               tikal.log_info(f"begin ({name}, {quine_uid})")
@@ -57,7 +70,42 @@ let
         vars = {};
         script = each-nahual-script-main;
       };
-      uid = store-path-to-key "${each-nahual-script}";
+      main-script-text =
+        let
+          script-file =
+            xsh.write-script {
+              name = "main_script.xsh";
+              inherit vars;
+              script = make-user-script each-nahual-vars script;
+            }
+          ;
+        in
+          "source ${script-file}"
+      ;
+      main-script-wrapper-text = { ... }:
+        if script == null
+        then
+          ''
+          def __main__(tikal, universe, quine_uid):
+            tikal.log_info("${name}: No 'script' provided.")
+          ''
+        else
+          with each-nahual-vars; ''
+          def __main__(tikal, universe, quine_uid):
+            ${tikal-context}=tikal
+            ${tikal-universe}=universe
+            tikal.log_info("begin the script execution of '${name}'")
+            ${main-script-text}
+            tikal.log_info("end the script execution of '${name}'")
+          ''
+      ;
+      main-script = xsh.write-script {
+        name = "main_script.xsh";
+        vars = {};
+        script = main-script-wrapper-text;
+      };
+      uid-each = store-path-to-key "${each-nahual-script}";
+      uid-main = store-path-to-key "${main-script}";
       packages = { universe, ...}:
         let
           main = xsh.write-script {
@@ -67,12 +115,14 @@ let
 
               def __main__(tikal):
                 universe = ${vars.universe}
-                quine_uid = "${uid}"
                 # todo:
                 # Check if tikal folder already exits. Skip if so.
                 # Otherwise, create the folder
                 from ${valid-name} import each
-                each.__main__(tikal, universe, quine_uid)
+                each.__main__(tikal, universe, "${uid-each}")
+
+                from ${valid-name} import main_script
+                script_main.__main__(tikal, universe, "${uid-main}")
             '';
           };
           __init__ =
@@ -90,6 +140,7 @@ let
               ${valid-name} = {
                 inherit __init__ main;
                 each = each-nahual-script;
+                main_script = main-script;
               };
             };
           }
