@@ -86,7 +86,7 @@ let
   module = { options, .. }:
     let
       store-lock = options.tikal.store-lock;
-      is-enabled = lib.length (lib.attrNames store-lock) > 0;
+      is-enabled = lib.length (lib.attrNames store-lock.items) > 0;
       sync-script = create-sync-script store-lock.items;
     in
       {
@@ -123,7 +123,8 @@ let
         };
 
         config = mkIf is-enabled {
-          tikal.sync.scripts [
+          tikal.sync.scripts = [
+            sync-script
           ];
         };
       }

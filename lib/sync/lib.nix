@@ -151,11 +151,14 @@ let
         inherit packages;
       }
   ;
-  sync-test = xsh.write-packages {
+  sync-lib = xsh.write-packages {
     name = "sync_test";
     packages = {
       sync_test = {
         __init__ = ./sync_test/__init__.py;
+      };
+      sync_lib = {
+        core = ./sync_lib/core.py;
       };
     };
   };
@@ -194,7 +197,7 @@ in
           name = "sync_tests";
           pythonpath = [
             packages.pythonpath
-            sync-test.pythonpath
+            sync-lib.pythonpath
           ];
           script = ''
             import unittest

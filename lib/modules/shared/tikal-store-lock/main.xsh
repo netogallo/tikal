@@ -6,12 +6,14 @@ import json
 from subprocess import CalledProcessError
 
 tikal = ${tikal-context}
-lock_public_path = path.join()
 universe = ${tikal-universe}
 
+lock_directory_path = path.join(universe.public_dir, "tikal_store_lock")
+lock_store_directory_path = path.join(lock_directory_path, "store")
+
 # Load the existing store lockfile. Load an empty dictionary if missing
-lock_directory = tikal.get_directory(path.join(universe.public_dir, "tikal_store_lock"), creeate=True)
-lock_store_directory = tikal.get_directory(path.join(lock_directory, "store"), create=True)
+lock_directory = tikal.get_directory(lock_directory_path, creeate=True)
+lock_store_directory = tikal.get_directory(lock_store_directory_path, create=True)
 lock_file = path.join(lock_directory, "tikal_store_lock.json")
 
 try:

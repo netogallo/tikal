@@ -2,28 +2,34 @@
 This file contains definitions that are useful for writing tests that involve
 the sync stage of Tikal in python/xonsh
 """
-from enum import Enum
+from sync_lib.core import LogLevel, Logger, Tikal
 
-class LogLevel(Enum):
-    Info = 7
+class TestLogger(Logger):
+    def __init__(
+        self,
+        loglevel
+    ):
+        super().__init__(loglevel)
+        self.__logs = {}
 
-class TikalMock:
+    def __log_message__(self, message, level):
+        if level not in self.__logs:
+            self.__logs[level] = []
+
+        self.__logs[level].append(message)
+
+class TikalMock(Tikal):
     """
     This is a mock implementation of the "Tikal" class which gets constructed by the
     sync script. The "Tikal" class contains contextual information that is used
     by the script to perform its job. This class simply mock that information.
     """
 
-
     def __init__(self, test_case):
-        super().__init__()
-        self.__logs = []
+        super().__init__(LogLevel.Debug)
         self.__test_case = test_case
 
     @property
     def test_case(self):
         return self.__test_case
-
-    def log_info(self, message: str) -> None:
-        self.__logs.append({'level': LogLevel.Info, 'message': message})
 
