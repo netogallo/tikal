@@ -14,7 +14,7 @@ let
 in
   test.with-tests
   {
-    inherit size disjoint;
+    inherit size merge-disjoint;
   }
   {
     tikal.prelude.attrs = {

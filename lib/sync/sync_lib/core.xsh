@@ -37,7 +37,7 @@ class Logger:
     level
   ):
 
-    if level > self.__loglevel:
+    if level.value > self.__loglevel.value:
       return
 
     fore = LOG_FORES.get(level) or Fore.WHITE
@@ -102,6 +102,9 @@ class Tikal:
 
   def get_file(self, loc):
     return path.join(self.__directory, loc)
+
+  def log_info(self, *args, **kwargs):
+    return self.log.log_info(*args, **kwargs)
 
   def get_directory(self, loc=None, create=False):
 

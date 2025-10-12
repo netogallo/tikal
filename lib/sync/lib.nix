@@ -11,7 +11,7 @@ let
     , description
     , each-nahual ? null
     , script ? null
-    , vars ? = {}
+    , vars ? {}
     }:
     let
       valid-name =
@@ -158,14 +158,14 @@ let
         __init__ = ./sync_test/__init__.py;
       };
       sync_lib = {
-        core = ./sync_lib/core.py;
+        core = ./sync_lib/core.xsh;
       };
     };
   };
 in
   test.with-tests
   {
-    inherit nahual-sync-script;
+    inherit nahual-sync-script sync-lib;
   }
   {
     tikal.sync =

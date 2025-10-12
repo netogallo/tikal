@@ -2,8 +2,9 @@
 let
   inherit (tikal.prelude) do;
   inherit (tikal.xonsh) xsh;
+  inherit (tikal.sync) sync-lib;
   foundations = callPackage ./sync/foundations.nix { };
-  core = callPackage ./sync/core.nix { };
+  #core = callPackage ./sync/core.nix { };
   keys = callPackage ./sync/keys.nix { };
   to-sync-script-module = { name, packages }:
     let
@@ -45,6 +46,7 @@ let
   # modules-sync-scripts = "${modules-sync-scripts}";
   sync-script = ''
     from docopt import docopt
+    from sync_lib.core import Tikal
 
     doc = """
     Usage:
@@ -90,9 +92,13 @@ in
         sources = [
           foundations.script
           keys.script
-          core.script
+          #core.script
         ];
-        pythonpath = modules-sync-scripts.package-paths;
+        pythonpath =
+          [ sync-lib
+          ]
+          ++ modules-sync-scripts.package-paths
+        ;
       }
     ;
     app = {

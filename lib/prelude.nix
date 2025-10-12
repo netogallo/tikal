@@ -14,6 +14,7 @@ let
       test = self.callPackage ./prelude/test.nix { inherit (tikal-config) test-filters; };
       list = self.callPackage ./prelude/list.nix {};
       path = self.callPackage ./prelude/path.nix {};
+      attrs = self.callPackage ./prelude/attrs.nix {};
     }
   );
 in

@@ -23,8 +23,9 @@ let
   the "sync" script.
   '';
   inherit (tikal.prelude) do;
-  inherit (tikal.sync) nahual-sync-script;
+  inherit (tikal.sync) nahual-sync-script sync-script;
   inherit (tikal.template) template;
+  inherit (tikal.xonsh) xsh;
   inherit (lib) types mkIf mkOption;
   lockdir-path = "public/lock";
   lockfile-path = "${lockdir-path}/lockfile.json";
@@ -130,9 +131,27 @@ let
       }
   ;
 in
+  test.with-tests
   {
     lib = {
       inherit create-locked-derivations;
     };
     inherit __doc__ module;
+  }
+  {
+    tikal.store-lock = xsh.test {
+      name = "store_lock_tests";
+      pythonpath = [
+        sync-lib.pythonpath
+      ];
+      script = ''
+        import unittest
+        from sync_test import TikalMock
+
+        class TestSync(unittest.TestCase):
+
+          def test_runs_store_lock_sync(self):
+            self.assertTrue(False)
+      '';
+    };
   }
