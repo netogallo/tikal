@@ -35,7 +35,7 @@ let
         let
           script-file =
             xsh.write-script {
-              name = "each_item.xhs";
+              name = "each_item.xsh";
               inherit vars;
               script = make-user-script each-nahual-vars each-nahual;
             }
@@ -122,7 +122,7 @@ let
                 each.__main__(tikal, universe, "${uid-each}")
 
                 from ${valid-name} import main_script
-                script_main.__main__(tikal, universe, "${uid-main}")
+                main_script.__main__(tikal, universe, "${uid-main}")
             '';
           };
           __init__ =
@@ -185,6 +185,7 @@ in
             nahual_name=${nahual-name}
             test_case = tikal.test_case
             test_case.assertTrue(nahual_name is not None, "Cannot access the nahual name")
+            test_case.__mark_nahual__(nahual_name)
             ''
           ;
         };
@@ -204,10 +205,19 @@ in
             from sync_test import TikalMock
 
             class TestSync(unittest.TestCase):
+
+              def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.__nahuales = []
+
+              def __mark_nahual__(self, nahual):
+                self.__nahuales.append(nahual)
           
               def test_runs_sync_script(self):
                 import test_sync_script
+                self.__nahuales = []
                 test_sync_script.__main__(TikalMock(self))
+                self.assertEqual(2, len(self.__nahuales))
             ''
           ;
         }

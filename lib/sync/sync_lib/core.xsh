@@ -40,8 +40,8 @@ class Logger:
     if level.value > self.__loglevel.value:
       return
 
-    fore = LOG_FORES.get(level) or Fore.WHITE
-    label = LOG_LABELS.get(level) or "<MISSING LOGLEVEL>"
+    fore = self.LOG_FORES.get(level) or Fore.WHITE
+    label = self.LOG_LABELS.get(level) or "<MISSING LOGLEVEL>"
 
     print(f"{fore}{label}: {message}{Style.RESET_ALL}")
     

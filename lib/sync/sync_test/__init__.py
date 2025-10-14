@@ -29,6 +29,9 @@ class TikalMock(Tikal):
         super().__init__(LogLevel.Debug)
         self.__test_case = test_case
 
+    def __create_logger__(self, loglevel):
+        return TestLogger(loglevel)
+
     @property
     def test_case(self):
         return self.__test_case
