@@ -1,6 +1,6 @@
 { lib }:
 let
-  get-tikal-dirs = { tikal-dir }: {
+  get-tikal-dirs = { tikal-dir, ... }: {
     inherit tikal-dir;
     private-dir = "${tikal-dir}/private";
     public-dir = "${tikal-dir}/public";

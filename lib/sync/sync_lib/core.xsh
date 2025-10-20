@@ -3,10 +3,10 @@ from colorama import Fore,Style
 from enum import Enum
 
 class LogLevel(Enum):
-  Info = 1
-  Warning = 2
-  Error = 3
-  Debug = 4
+  Info = 0
+  Warning = 1
+  Error = 2
+  Debug = 3
 
 class Logger:
 
@@ -70,7 +70,8 @@ class Tikal:
   ):
 
     self.__log = None
-    self.__loglevel = loglevel
+
+    self.__loglevel = LogLevel(loglevel)
     self.__directory = $PWD
     self.__passwords = passwords
 

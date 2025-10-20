@@ -95,7 +95,7 @@ in
           #core.script
         ];
         pythonpath =
-          [ sync-lib
+          [ sync-lib.pythonpath
           ]
           ++ modules-sync-scripts.package-paths
         ;
