@@ -29,6 +29,7 @@ let
     tikal-foundations = self.callPackage ../shared/tikal-foundations.nix {};
     tikal-log = self.callPackage ../shared/tikal-log.nix {};
     nahual-pkgs = nahual-pkgs self;
+    tikal-store-lock = self.callPackage ../shared/tikal-store-lock.nix {};
   });
 in
   scope

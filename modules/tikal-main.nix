@@ -9,6 +9,7 @@
 let
   inherit (lib) types mkOption;
   imports = [
+    ./config/tikal-storelock.nix
     ./universe/members.nix
     ./networks/tor.nix
     ./remote-access/ssh.nix
