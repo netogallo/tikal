@@ -25,14 +25,9 @@ class TikalMock(Tikal):
     by the script to perform its job. This class simply mock that information.
     """
 
-    def __init__(self, test_case):
+    def __init__(self):
         super().__init__(LogLevel.Debug)
-        self.__test_case = test_case
 
     def __create_logger__(self, loglevel):
         return TestLogger(loglevel)
-
-    @property
-    def test_case(self):
-        return self.__test_case
 

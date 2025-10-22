@@ -225,7 +225,10 @@ let
         name = "tests";
         packages = {
           tikal_xsh_tests = {
-            tests = script-txt;
+            tests = pkgs.writeTextFile {
+              name = "tests.xsh";
+              text = script-txt;
+            };
           };
         };
       };

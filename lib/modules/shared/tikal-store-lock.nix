@@ -27,6 +27,8 @@ let
   inherit (tikal.template) template;
   inherit (tikal.xonsh) xsh;
   inherit (lib) types mkIf mkOption;
+  inherit (tikal.prelude) test;
+
   lockdir-path = "public/lock";
   lockfile-path = "${lockdir-path}/lockfile.json";
   lockstore-path = "${lockdir-path}/store";

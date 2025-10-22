@@ -162,64 +162,103 @@ let
       };
     };
   };
+  sync-script-tests =
+    { sync-script
+    , tests
+    , universe ? {}
+    }:
+    let
+      override-user-script = script-fn:
+        let
+          script-fn-override = args:
+            script-fn (args // { test-vars = args.vars // test-env-vars; })
+          ;
+        in
+          if script-fn == null
+          then null
+          else
+            script-fn-override
+      ;
+      sync-script-test =
+        sync-script //
+        {
+          each-nahual = override-user-script sync-script.each-nahual;
+        }
+      ;
+      test-vars-prefix = "$_test_var_unique_9tbt923gs";
+      test-tikal = "${test-vars-prefix}_tikal";
+      test-case = "${test-vars-prefix}_test_case";
+      test-context = "${test-vars-prefix}_test_context";
+      test-env-vars = { inherit test-case test-tikal test-context; };
+      script-builder = nahual-sync-script sync-script-test;
+      script = script-builder.packages { inherit universe; };
+      name = script-builder.name;
+    in
+      xsh.test {
+        inherit name;
+        pythonpath = [
+          script.pythonpath
+          sync-lib.pythonpath
+        ];
+        script = ''
+          import unittest
+          from sync_test import TikalMock
+
+          ${test-tikal} = None
+          ${test-case} = None
+          ${test-context} = None
+
+          class SyncTestCaseBase(unittest.TestCase):
+
+            def __run_sync_script__(self, test_context = None):
+              import ${name} as sync_script
+              ${test-tikal} = TikalMock()
+              ${test-case} = self
+              ${test-context} = test_context
+              sync_script.__main__(${test-tikal})
+
+          ${tests}
+        '';
+      }
+  ;
 in
   test.with-tests
   {
     inherit nahual-sync-script sync-lib;
   }
   {
-    tikal.sync =
-      let
-        universe = {
-          nahuales = {
-            test-nahual-1 = {};
-            test-nahual-2 = {};
-          };
+    tikal.sync = sync-script-tests {
+      universe = {
+        nahuales = {
+          test-nahual-1 = {};
+          test-nahual-2 = {};
         };
-        sync-script-args = {
-          name = "test_sync_script";
-          description = "Sync script for unit testing";
-          each-nahual = { vars, ... }: with vars;
-            ''
-            tikal=${tikal-context}
-            nahual_name=${nahual-name}
-            test_case = tikal.test_case
-            test_case.assertTrue(nahual_name is not None, "Cannot access the nahual name")
-            test_case.__mark_nahual__(nahual_name)
-            ''
-          ;
-        };
-        packages =
-          (nahual-sync-script sync-script-args).packages
-          { inherit universe; }
+      };
+      sync-script = {
+        name = "test_sync_script";
+        description = "Sync script to test running sync scripts";
+        each-nahual = { test-vars, ... }: with test-vars;
+          ''
+          context = ${test-context}
+          nahual_name = ${nahual-name}
+          context.nahuales.append(nahual_name)
+          ''
         ;
-      in
-        xsh.test {
-          name = "sync_tests";
-          pythonpath = [
-            packages.pythonpath
-            sync-lib.pythonpath
-          ];
-          script = ''
-            import unittest
-            from sync_test import TikalMock
+      };
+      tests =
+        ''
+        from types import SimpleNamespace
 
-            class TestSync(unittest.TestCase):
+        class TestSyncScript(SyncTestCaseBase):
 
-              def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                self.__nahuales = []
+          def test_runs_sync_script(self):
+            context = SimpleNamespace()
+            context.nahuales = []
 
-              def __mark_nahual__(self, nahual):
-                self.__nahuales.append(nahual)
-          
-              def test_runs_sync_script(self):
-                import test_sync_script
-                self.__nahuales = []
-                test_sync_script.__main__(TikalMock(self))
-                self.assertEqual(2, len(self.__nahuales))
-            ''
-          ;
-        }
-    ;
+            self.__run_sync_script__(test_context = context)
+            
+            expected = set(["test-nahual-1", "test-nahual-2"])
+            self.assertEqual(expected, set(context.nahuales))
+        '';
+    };
   }
