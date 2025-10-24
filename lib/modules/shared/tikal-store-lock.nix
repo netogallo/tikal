@@ -40,11 +40,12 @@ let
         key
         "$>" lib.mapAttrsToList mapper
         "|>" lib.sort (a: b: a > b)
-        "|>" lib.hashString "sha256"
+        "|>" lib.concatStrings
+        "|>" builtins.hashString "sha256"
 
       ]
   ;
-  to-locked-config = { key, derive }:
+  to-lock-entry = { key, derive }:
     let
       hashed-key = hash-key key;
     in
@@ -52,6 +53,10 @@ let
         ${hashed-key} = { inherit derive; };
       }
   ;
+  to-lock-config = do [
+    map to-lock-entry
+    "|>" lib.foldAttrs (arg: state: state // arg) {}
+  ];
   create-locked-derivations = args-any:
     let
       args =
@@ -59,11 +64,7 @@ let
         then [ args-any ]
         else args-any
       ;
-      items = do [
-        args-any
-        "$>" map to-locked-config
-        "|>" lib.foldAttrs (arg: state: state // arg) {}
-      ];
+      items = to-lock-config args;
     in
       {
         config.tikal.store-lock.items = items;
@@ -100,7 +101,7 @@ in
         name = "tikal_store_lock_test";
         description = "Test script for store locks";
         vars = {
-          locks = [
+          locks = to-lock-config [
             {
               key = { name = "lock1"; };
               derive = pkgs.writeTextFile { name = "lock1"; text = "lock1"; destination = "/lock1"; };

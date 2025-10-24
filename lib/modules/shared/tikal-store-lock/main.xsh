@@ -12,7 +12,7 @@ lock_directory_path = path.join(universe.public_dir, "tikal_store_lock")
 lock_store_directory_path = path.join(lock_directory_path, "store")
 
 # Load the existing store lockfile. Load an empty dictionary if missing
-lock_directory = tikal.get_directory(lock_directory_path, creeate=True)
+lock_directory = tikal.get_directory(lock_directory_path, create=True)
 lock_store_directory = tikal.get_directory(lock_store_directory_path, create=True)
 lock_file = path.join(lock_directory, "tikal_store_lock.json")
 
@@ -57,12 +57,14 @@ def is_lockpath_available(key):
     # Proceed to overwrite with a new path.
     return False
 
-for key,lock in locks:
+for key,lock in locks.items():
 
     if not is_lockpath_available(key):
-        dest_name = path.basename(lock.derive)
-        dest = path.join(lock_store_directory, lock.derive)
-        cp -r f"{dest_name}" f"{dest}"
+        src = lock.derive
+        dest_name = path.basename(src)
+        dest = path.join(lock_store_directory, dest_name)
+        echo f"cp -r {src} {dest}"
+        cp -r f"{src}" f"{dest}"
         store_lock[key] = dest_name
         tikal.log_info(f"Added '{dest}' to the store lock with key '{key}'")
 

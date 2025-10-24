@@ -1,4 +1,4 @@
-{ tikal, pkgs, lib, ... }:
+{ tikal, pkgs, lib, callPackage, ... }:
 let
   inherit (tikal.prelude) do store-path-to-key;
   inherit (tikal.prelude.python) is-valid-python-identifier store-path-to-python-identifier;
@@ -168,6 +168,15 @@ let
     , universe ? {}
     }:
     let
+      universe-instance =
+        callPackage
+        ../universe.nix
+        {
+          inherit universe;
+          flake-root = ./.;
+          base-dir = null;
+        }
+      ; 
       override-user-script = script-fn:
         let
           script-fn-override = args:
@@ -192,7 +201,7 @@ let
       test-context = "${test-vars-prefix}_test_context";
       test-env-vars = { inherit test-case test-tikal test-context; };
       script-builder = nahual-sync-script sync-script-test;
-      script = script-builder.packages { inherit universe; };
+      script = script-builder.packages { universe = universe-instance.config; };
       name = script-builder.name;
     in
       xsh.test {
