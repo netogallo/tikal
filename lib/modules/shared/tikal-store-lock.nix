@@ -1,4 +1,4 @@
-{ tikal, lib, ... }:
+{ tikal, pkgs, lib, ... }:
 let
   __doc__ = ''
   Tikal relies a lot on "impure" derivations. Although theese derivations are discouraged
@@ -23,8 +23,8 @@ let
   the "sync" script.
   '';
   inherit (tikal.prelude) do;
-  inherit (tikal.sync) nahual-sync-script sync-script;
-  inherit (tikal.template) template;
+  inherit (tikal.sync) nahual-sync-script sync-script sync-script-tests;
+  inherit (tikal.prelude.template) template;
   inherit (tikal.xonsh) xsh;
   inherit (lib) types mkIf mkOption;
   inherit (tikal.prelude) test;
@@ -92,19 +92,31 @@ in
     inherit __doc__ create-sync-script create-locked-derivations;
   }
   {
-    tikal.store-lock = xsh.test {
-      name = "store_lock_tests";
-      pythonpath = [
-        sync-lib.pythonpath
-      ];
-      script = ''
-        import unittest
-        from sync_test import TikalMock
+    tikal.store-lock = sync-script-tests {
+      universe = {
+        nahuales = {};
+      };
+      sync-script = {
+        name = "tikal_store_lock_test";
+        description = "Test script for store locks";
+        vars = {
+          locks = [
+            {
+              key = { name = "lock1"; };
+              derive = pkgs.writeTextFile { name = "lock1"; text = "lock1"; destination = "/lock1"; };
+            }
+          ];
+        };
+        script = { vars, ... }: template ./tikal-store-lock/main.xsh vars;
+      };
+      tests =
+        ''
+        class TestStoreLock(SyncTestCaseBase):
 
-        class TestSync(unittest.TestCase):
-
-          def test_runs_store_lock_sync(self):
+          def test_lock_derivation(self):
+            self.__run_sync_script__()
             self.assertTrue(False)
-      '';
+        ''
+      ;
     };
   }

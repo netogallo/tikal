@@ -126,19 +126,26 @@ let
             ["_"]
             name
           ;
-          var-set = ''
+          var-object = ''
             from box import Box
             with open("${var-file}", "r") as jf:
               ${var-unique-name} = Box.from_json(jf.read())
+          '';
+          var-list = ''
+            from box import BoxList
+            with open("${var-file}", "r") as jf:
+              ${var-unique-name} = BoxList.from_json(jf.read())
           '';
           var-str = ''
             ${var-unique-name} = "${value}"
           '';
           var-decl =
-            if lib.isString value
+            if lib.isString value || lib.isDerivation value
             then var-str
             else if lib.isAttrs value
-            then var-set
+            then var-object
+            else if lib.isList value
+            then var-list
             else
               throw "The variable type '${lib.typeOf value}' of '${name}' is not supported by xsh."
           ;
@@ -282,7 +289,7 @@ let
             result = super().run(tests)
             result.save_tikal()
             return result
-        
+
         unittest.main(module='tikal_xsh_tests.tests', testRunner=CollectingRunner)
         ''
       ;
@@ -295,8 +302,20 @@ let
       };
       test-outcome = pkgs.runCommand "${name}-outcome" {} ''
         set +e
-        TIKAL_XSH_TESTS_RESULTS=$out ${test-script}/bin/${name}
-        exit 0
+        export TIKAL_XSH_TESTS_RESULTS=$out
+        ${test-script}/bin/${name} &> output.txt
+        result="$?"
+
+        if [ ! -f "$out" ]; then
+          error=$(cat output.txt)
+          ${pkgs.jq}/bin/jq -n --arg message "$error" '{${name}: { success: false, message: $message }}' > $out
+        fi
+
+        if [ "$result" != 0 ]; then
+          cat output.txt
+        fi
+
+        exit "$result"
       '';
       tests = do [
         test-outcome

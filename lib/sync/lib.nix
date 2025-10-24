@@ -4,7 +4,7 @@ let
   inherit (tikal.prelude.python) is-valid-python-identifier store-path-to-python-identifier;
   inherit (tikal.xonsh) xsh;
   inherit (tikal.prelude) test;
-  inherit (tikal.prelude.attrs) merge-disjoint;
+  inherit (tikal.prelude.attrs) merge-disjoint map-attrs-with;
   nahual-sync-script =
     {
       name
@@ -180,10 +180,11 @@ let
             script-fn-override
       ;
       sync-script-test =
-        sync-script //
+        map-attrs-with
         {
-          each-nahual = override-user-script sync-script.each-nahual;
+          each-nahual = _: override-user-script;
         }
+        sync-script
       ;
       test-vars-prefix = "$_test_var_unique_9tbt923gs";
       test-tikal = "${test-vars-prefix}_tikal";
@@ -210,12 +211,19 @@ let
 
           class SyncTestCaseBase(unittest.TestCase):
 
+            @property
+            def tikal(self):
+              return self.__tikal
+
+            def setUp(self):
+              self.__tikal = TikalMock()
+              ${test-tikal} = self.__tikal
+              ${test-case} = self
+
             def __run_sync_script__(self, test_context = None):
               import ${name} as sync_script
-              ${test-tikal} = TikalMock()
-              ${test-case} = self
               ${test-context} = test_context
-              sync_script.__main__(${test-tikal})
+              sync_script.__main__(self.__tikal)
 
           ${tests}
         '';
@@ -224,7 +232,7 @@ let
 in
   test.with-tests
   {
-    inherit nahual-sync-script sync-lib;
+    inherit nahual-sync-script sync-lib sync-script-tests;
   }
   {
     tikal.sync = sync-script-tests {
