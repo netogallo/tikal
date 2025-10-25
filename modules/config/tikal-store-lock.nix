@@ -1,8 +1,8 @@
-{ options, lib, tikal-store-lock, ... }:
+{ config, lib, tikal-store-lock, ... }:
 let
   inherit (lib) mkIf mkOption types;
   inherit (tikal-store-lock) create-sync-script;
-  store-lock = options.tikal.store-lock;
+  store-lock = config.tikal.store-lock;
   is-enabled = lib.length (lib.attrNames store-lock.items) > 0;
   sync-script = create-sync-script store-lock.items;
 in

@@ -1,7 +1,7 @@
 from os import path
 from colorama import Fore,Style
 from enum import Enum
-from time import time
+from datetime import datetime
 
 class LogLevel(Enum):
   Info = 0
@@ -43,10 +43,10 @@ class Logger:
 
     fore = self.LOG_FORES.get(level) or Fore.WHITE
     label = self.LOG_LABELS.get(level) or "<MISSING LOGLEVEL>"
-    when = time()
+    when = datetime.now()
 
     props = "\n".join(
-      f"\t{key}:\n\t\t{formated_value}"
+      f"\t{key}:\n\t\t{formatted_value}"
       for key,value in kwargs.items()
       for formatted_value in [value.replace("\n", "\n\t\t")]
     )

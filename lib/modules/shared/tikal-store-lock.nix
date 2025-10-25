@@ -115,6 +115,7 @@ in
 
           def test_lock_derivation(self):
             import json
+            from os import path
 
             self.__run_sync_script__()
 
@@ -122,11 +123,36 @@ in
             self.assertEqual(1, len(lock_paths))
 
             lock_file = lock_paths[0]['lock_file']
+            lock_store_directory = lock_paths[0]['lock_store_directory']
             with open(lock_file, 'r') as fp:
               written_lock = json.load(fp)
-            input_lock = ${locks}
+            input_locks = ${locks}
 
-            self.assertTrue(False)
+            self.assertTrue(
+              len(written_lock) == 1,
+              f"Expected 1 item in the lockfile '{lock_file}'"
+            )
+
+            for uid,input_lock in input_locks.items():
+
+              self.assertTrue(
+                uid in written_lock,
+                "Lock was not written to store lock file"
+              )
+
+              written_lock_path = written_lock[uid]
+              derive = input_lock.derive
+
+              self.assertTrue(
+                written_lock_path in derive,
+                f"Expected '{written_lock_path}' to appear in '{derive}'"
+              )
+
+              lock_store_written_path = path.join(lock_store_directory, written_lock_path)
+              self.assertTrue(
+                path.isdir(lock_store_written_path),
+                f"Expected '{lock_store_written_path}' to be a directory."
+              )
         ''
       ;
     };
