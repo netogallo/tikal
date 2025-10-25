@@ -16,6 +16,13 @@ lock_directory = tikal.get_directory(lock_directory_path, create=True)
 lock_store_directory = tikal.get_directory(lock_store_directory_path, create=True)
 lock_file = path.join(lock_directory, "tikal_store_lock.json")
 
+tikal.log.log_debug(
+  "Lock Paths",
+  lock_directory = lock_directory,
+  lock_store_directory = lock_store_directory,
+  lock_file = lock_file
+)
+
 try:
     with open(lock_file, 'r') as lock_fp:
         store_lock = json.load(lock_fp)
@@ -63,7 +70,6 @@ for key,lock in locks.items():
         src = lock.derive
         dest_name = path.basename(src)
         dest = path.join(lock_store_directory, dest_name)
-        echo f"cp -r {src} {dest}"
         cp -r f"{src}" f"{dest}"
         store_lock[key] = dest_name
         tikal.log_info(f"Added '{dest}' to the store lock with key '{key}'")

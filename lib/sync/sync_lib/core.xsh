@@ -1,6 +1,7 @@
 from os import path
 from colorama import Fore,Style
 from enum import Enum
+from time import time
 
 class LogLevel(Enum):
   Info = 0
@@ -33,8 +34,8 @@ class Logger:
 
   def __log_message__(
     self,
-    message,
-    level
+    level,
+    **kwargs
   ):
 
     if level.value > self.__loglevel.value:
@@ -42,21 +43,35 @@ class Logger:
 
     fore = self.LOG_FORES.get(level) or Fore.WHITE
     label = self.LOG_LABELS.get(level) or "<MISSING LOGLEVEL>"
+    when = time()
 
-    print(f"{fore}{label}: {message}{Style.RESET_ALL}")
+    props = "\n".join(
+      f"\t{key}:\n\t\t{formated_value}"
+      for key,value in kwargs.items()
+      for formatted_value in [value.replace("\n", "\n\t\t")]
+    )
+
+    entry = "\n".join([
+      f"{fore}",
+      f"LOG [{label}] [{when}]",
+      props,
+      f"{Style.RESET_ALL}"
+    ])
+
+    print(entry)
     
 
-  def log_info(self, message):
-    self.__log_message__(message, LogLevel.Info)
+  def log_info(self, message, **kwargs):
+    self.__log_message__(LogLevel.Info, message=message, **kwargs)
 
-  def log_warning(self, message):
-    self.__log_message__(message, LogLevel.Warning)
+  def log_warning(self, message, **kwargs):
+    self.__log_message__(LogLevel.Warning, message=message, **kwargs)
 
-  def log_error(self, message):
-    self.__log_message__(message, LogLevel.Error)
+  def log_error(self, message, **kwargs):
+    self.__log_message__(LogLevel.Error, message=message, **kwargs)
 
-  def log_debug(self, message):
-    self.__log_message__(message, LogLevel.Debug)
+  def log_debug(self, message, **kwargs):
+    self.__log_message__(LogLevel.Debug, message=message, **kwargs)
 
   def create_dirs(self, *dirs):
     for dir in dirs:

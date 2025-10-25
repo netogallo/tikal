@@ -4,19 +4,33 @@ the sync stage of Tikal in python/xonsh
 """
 from sync_lib.core import LogLevel, Logger, Tikal
 
+def is_matching_log(query, entry):
+    from fnmatch import fnmatch
+    return all(
+        value is not None and fnmatch(str(value), query_value)
+        for key,query_value in query.items()
+        for value in [entry.get(key)]
+    )
+
 class TestLogger(Logger):
     def __init__(
         self,
         loglevel
     ):
         super().__init__(loglevel)
-        self.__logs = {}
+        self.__logs = []
 
-    def __log_message__(self, message, level):
-        if level not in self.__logs:
-            self.__logs[level] = []
+    def __log_message__(self, level, message, **kwargs):
 
-        self.__logs[level].append(message)
+        entry = { 'message': message, 'loglevel': level, **kwargs }
+
+        self.__logs.append(entry)
+
+    def get_matching_logs(self, **kwargs):
+        return [
+            log
+            for log in self.__logs if is_matching_log(kwargs, log)
+        ]
 
 class TikalMock(Tikal):
     """

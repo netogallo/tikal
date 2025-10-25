@@ -34,7 +34,7 @@ let
   lockstore-path = "${lockdir-path}/store";
   hash-key = key:
     let
-      mapper = name: value: "${name}=${value}";
+      mapper = name: value: builtins.hashString "sha256" "${name}=${value}";
     in
       do [
         key
@@ -42,7 +42,6 @@ let
         "|>" lib.sort (a: b: a > b)
         "|>" lib.concatStrings
         "|>" builtins.hashString "sha256"
-
       ]
   ;
   to-lock-entry = { key, derive }:
@@ -116,6 +115,9 @@ in
 
           def test_lock_derivation(self):
             self.__run_sync_script__()
+
+            lock_paths = self.tikal.log.get_matching_logs(message = "Lock Paths")
+            self.assertEqual(1, len(lock_paths))
             self.assertTrue(False)
         ''
       ;
