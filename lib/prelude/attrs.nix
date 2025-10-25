@@ -13,8 +13,9 @@ let
   ;
   map-attrs-with =
     lib.makeOverridable(
-      { strict }: mappings: attrs:
+      { strict, defaults }: mappings: attrs-in:
       let
+        attrs = defaults // attrs-in;
         present-mappings =
           lib.filterAttrs
             (
@@ -35,7 +36,7 @@ let
         attrs //
         (lib.mapAttrs (name: fn: fn name attrs.${name}) present-mappings)
       )
-      { strict = false; }
+      { strict = false; defaults = {}; }
   ;
 in
   test.with-tests

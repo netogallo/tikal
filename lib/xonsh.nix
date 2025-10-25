@@ -85,41 +85,13 @@ let
         inherit name site-packages pythonpath;
       }
   ;
-    
-  xsh-write-script =
-    {
-      name
-    , script
-    , vars ? {}
-    , sources ? []
-    }:
-    let
-      xonsh-globals = "__XONSH_GLOBALS_8e7d3fd1_8bdf_45c4_a27b_9cf320a2e5b4";
-      xonsh-init = ''
-        if '${xonsh-globals}' not in globals():
-          from types import SimpleNamespace
-          ${xonsh-globals} = SimpleNamespace()
-          ${xonsh-globals}.sources = set()
 
-      '';
-      source-file = file: ''
-        if "${file}" not in ${xonsh-globals}.sources:
-          source "${file}"
-          ${xonsh-globals}.sources.add("${file}")
-      '';
-      save-var = name: value: pkgs.writeTextFile {
-        inherit name;
-        text = builtins.toJSON value;
-      };
-      get-path-hash = do [
-        builtins.baseNameOf
-        "|>" lib.splitString "-"
-        "|>" builtins.head
-      ];
+  to-xsh-vars = vars:
+    let
       mk-var = name: value:
         let
           var-file = save-var name value;
-          var-unique-name = "__${get-path-hash var-file}_${var-name}";
+          var-unique-name = "$_${get-path-hash var-file}_${var-name}";
           var-name =
             lib.replaceStrings
             ["-"]
@@ -168,13 +140,47 @@ let
           bindings = s.bindings // var.bindings;
         }
       ;
+      save-var = name: value: pkgs.writeTextFile {
+        inherit name;
+        text = builtins.toJSON value;
+      };
+      get-path-hash = do [
+        builtins.baseNameOf
+        "|>" lib.splitString "-"
+        "|>" builtins.head
+      ];
       empty-vars = { bindings = {}; text = ""; };
-      all-vars = do [
+    in
+      do [
         vars
         "$>" builtins.mapAttrs mk-var
         "|>" builtins.attrValues
         "|>" lib.foldl combine-vars empty-vars
-      ];
+      ]
+  ;
+    
+  xsh-write-script =
+    {
+      name
+    , script
+    , vars ? {}
+    , sources ? []
+    }:
+    let
+      all-vars = to-xsh-vars vars;
+      xonsh-globals = "__XONSH_GLOBALS_8e7d3fd1_8bdf_45c4_a27b_9cf320a2e5b4";
+      xonsh-init = ''
+        if '${xonsh-globals}' not in globals():
+          from types import SimpleNamespace
+          ${xonsh-globals} = SimpleNamespace()
+          ${xonsh-globals}.sources = set()
+      '';
+      source-file = file: ''
+        if "${file}" not in ${xonsh-globals}.sources:
+          source "${file}"
+          ${xonsh-globals}.sources.add("${file}")
+      '';
+
       sources-txt = do [
         sources
         "$>" map source-file
@@ -337,7 +343,7 @@ in
       program = "${xonsh}/bin/xonsh";
     };
     xsh = {
-      inherit write-script-bin write-packages;
+      inherit write-script-bin write-packages to-xsh-vars;
       write-script = xsh-write-script;
       test = test-xsh;
     };

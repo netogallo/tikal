@@ -166,6 +166,7 @@ let
     { sync-script
     , tests
     , universe ? {}
+    , vars ? {}
     }:
     let
       universe-instance =
@@ -188,12 +189,18 @@ let
           else
             script-fn-override
       ;
+      sync-script-with-overrides =
+        map-attrs-with.override
+        { defaults = { vars = {}; }; }
+        { vars = _: sync-vars: sync-vars // vars; }
+        sync-script
+      ;
       sync-script-test =
         map-attrs-with
         {
           each-nahual = _: override-user-script;
         }
-        sync-script
+        sync-script-with-overrides
       ;
       test-vars-prefix = "$_test_var_unique_9tbt923gs";
       test-tikal = "${test-vars-prefix}_tikal";
@@ -203,6 +210,8 @@ let
       script-builder = nahual-sync-script sync-script-test;
       script = script-builder.packages { universe = universe-instance.config; };
       name = script-builder.name;
+      xsh-vars = xsh.to-xsh-vars vars;
+      tests-text = tests { vars = xsh-vars.bindings; };
     in
       xsh.test {
         inherit name;
@@ -234,7 +243,8 @@ let
               ${test-context} = test_context
               sync_script.__main__(self.__tikal)
 
-          ${tests}
+          ${xsh-vars.text}
+          ${tests-text}
         '';
       }
   ;
@@ -262,7 +272,7 @@ in
           ''
         ;
       };
-      tests =
+      tests = { ... }:
         ''
         from types import SimpleNamespace
 

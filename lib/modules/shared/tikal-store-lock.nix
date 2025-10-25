@@ -96,28 +96,36 @@ in
       universe = {
         nahuales = {};
       };
+      vars = {
+        locks = to-lock-config [
+          {
+            key = { name = "lock1"; };
+            derive = pkgs.writeTextFile { name = "lock1"; text = "lock1"; destination = "/lock1"; };
+          }
+        ];
+      };
       sync-script = {
         name = "tikal_store_lock_test";
         description = "Test script for store locks";
-        vars = {
-          locks = to-lock-config [
-            {
-              key = { name = "lock1"; };
-              derive = pkgs.writeTextFile { name = "lock1"; text = "lock1"; destination = "/lock1"; };
-            }
-          ];
-        };
         script = { vars, ... }: template ./tikal-store-lock/main.xsh vars;
       };
-      tests =
+      tests = { vars, ... }: with vars;
         ''
         class TestStoreLock(SyncTestCaseBase):
 
           def test_lock_derivation(self):
+            import json
+
             self.__run_sync_script__()
 
             lock_paths = self.tikal.log.get_matching_logs(message = "Lock Paths")
             self.assertEqual(1, len(lock_paths))
+
+            lock_file = lock_paths[0]['lock_file']
+            with open(lock_file, 'r') as fp:
+              written_lock = json.load(fp)
+            input_lock = ${locks}
+
             self.assertTrue(False)
         ''
       ;
