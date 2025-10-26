@@ -46,7 +46,7 @@ class Logger:
     when = datetime.now()
 
     props = "\n".join(
-      f"\t{key}:\n\t\t{formatted_value}"
+      f"\t{key}: {formatted_value}"
       for key,value in kwargs.items()
       for formatted_value in [value.replace("\n", "\n\t\t")]
     )

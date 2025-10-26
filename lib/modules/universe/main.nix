@@ -1,15 +1,15 @@
-{ pkgs, flake-scope, tikal, lib, universe, ... }:
+{ pkgs, flake-context, tikal, lib, universe, ... }:
 let
   log = tikal.prelude.log.add-context { file = ./main.nix; };
   nahual-pkgs = self: nahuales:
     let
       log' = log.add-context { function = "nahual-pkgs"; };
-      flake-context = log.log-value "flake-context" (flake-scope nahuales).flake-context;
+      flake-config = log.log-value "flake-context" (flake-context.config nahuales);
       make-pkgs = name: pkg: lib.mapAttrs (make-nahual-pkg pkg) nahuales;
       make-nahual-pkg = pkg: name: nahual:
         let
           nahual-config = {
-            flake = flake-context.config.nahuales.${name};
+            flake = flake-config.nahuales.${name};
           };
           package-context = {
             inherit nahual-config;

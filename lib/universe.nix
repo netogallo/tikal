@@ -1,20 +1,15 @@
 { universe, lib, flake-root, base-dir, callPackage, tikal, pkgs, ... }:
 let
   log = tikal.prelude.log.add-context { file = ./universe.nix; };
-  flake-scope = nahuales:
+  universe-eval-scope =
     lib.makeScope pkgs.newScope (self: {
-      inherit tikal nahuales lib pkgs flake-root base-dir;
+      inherit tikal lib pkgs flake-root base-dir universe;
+      universe-eval-context = self.callPackage ./modules/universe/main.nix { };
       shared-context = self.callPackage ./universe/shared-context.nix {};
       flake-context = self.callPackage ./universe/flake-context.nix {};
     })
   ;
-  universe-eval-context =
-    callPackage
-    ./modules/universe/main.nix
-    {
-      inherit universe flake-scope;
-    }
-  ;
+  inherit (universe-eval-scope) universe-eval-context flake-context;
   module = lib.evalModules {
     modules = [
       ../modules/tikal-main.nix
@@ -50,5 +45,5 @@ in
     # flake contains all the attributes that are to be used
     # by the flake when building the set of nahuales after
     # sync has been run.
-    flake = (flake-scope module.config.nahuales).flake-context;
+    flake = flake-context.override { nahuales = module.config.nahuales; };
   }
