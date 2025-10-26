@@ -28,22 +28,11 @@ let
   inherit (tikal.xonsh) xsh;
   inherit (lib) types mkIf mkOption;
   inherit (tikal.prelude) test;
+  inherit (tikal.store.lock) hash-key;
 
   lockdir-path = "public/lock";
   lockfile-path = "${lockdir-path}/lockfile.json";
   lockstore-path = "${lockdir-path}/store";
-  hash-key = key:
-    let
-      mapper = name: value: builtins.hashString "sha256" "${name}=${value}";
-    in
-      do [
-        key
-        "$>" lib.mapAttrsToList mapper
-        "|>" lib.sort (a: b: a > b)
-        "|>" lib.concatStrings
-        "|>" builtins.hashString "sha256"
-      ]
-  ;
   to-lock-entry = { key, derive }:
     let
       hashed-key = hash-key key;
@@ -89,7 +78,7 @@ let
 in
   test.with-tests
   {
-    inherit __doc__ create-sync-script create-locked-derivations;
+    inherit __doc__ create-sync-script create-locked-derivations to-lock-config;
   }
   {
     tikal.store-lock = sync-script-tests {

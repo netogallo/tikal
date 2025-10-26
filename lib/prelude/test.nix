@@ -86,6 +86,7 @@ let
       {
         __functor = self: test: run test "Expeted expression to be 'true'.";
         eq = a: b: run (a == b) "Expected '${trace.debug-print a}', got '${trace.debug-print b}'";
+        neq = a: b: run (a != b) "Expected '${trace.debug-print a}' and '${trace.debug-print b}' to be different.";
         all = values: {
           success = lib.all (r: r.success) values;
           message = lib.concatStringsSep result-sep (map (r: r.message) values);

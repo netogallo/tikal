@@ -1,16 +1,23 @@
 { config, lib, tikal-store-lock, ... }:
 let
   inherit (lib) mkIf mkOption types;
-  inherit (tikal-store-lock) create-sync-script;
-  store-lock = config.tikal.store-lock;
-  is-enabled = lib.length (lib.attrNames store-lock.items) > 0;
-  sync-script = create-sync-script store-lock.items;
+  inherit (tikal-store-lock) create-sync-script to-lock-config;
+  store-lock = config.store-lock;
+  is-enabled = lib.length store-lock.items > 0;
+  sync-script =
+    create-sync-script (to-lock-config store-lock.items);
+  store-lock-definition = {
+    options = {
+      key = mkOption { type = types.attrsOf types.str; };
+      derive = mkOption { type = types.package; };
+    };
+  };
 in
   {
-    options.tikal.store-lock = {
+    options.store-lock = {
       items = mkOption {
-        default = {};
-        type = types.attrsOf types.unspecified;
+        default = [];
+        type = types.listOf (types.submodule store-lock-definition);
         description = ''
           This option defines the derivations that get locked by the "sync" script. Tikal has the
           ability to describe many "impure" aspects of the universe as a derivation. One notable

@@ -20,6 +20,7 @@ let
         prelude = self.callPackage ./lib/prelude.nix {};
         xonsh = self.callPackage ./lib/xonsh.nix {};
         sync = self.callPackage ./lib/sync/lib.nix {};
+        store = self.callPackage ./lib/store.nix {};
       };
     }
   );
