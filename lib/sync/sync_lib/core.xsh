@@ -75,7 +75,7 @@ class Logger:
 
   def create_dirs(self, *dirs):
     for dir in dirs:
-      self.log_info(f"Creating directory: {dir}")
+      self.log_info(f"Creating directory", path = dir)
 
 class Tikal:
   def __init__(
@@ -87,8 +87,12 @@ class Tikal:
     self.__log = None
 
     self.__loglevel = LogLevel(loglevel)
-    self.__directory = $PWD
+    self.__root = $PWD
     self.__passwords = passwords
+
+  @property
+  def __root__(self):
+    return self.__root
 
   def __create_logger__(self, loglevel):
     return Logger(loglevel)
@@ -98,7 +102,7 @@ class Tikal:
 
     if self.__log is None:
       self.__log = self.__create_logger__(self.__loglevel)
-      self.log.log_info(f"Working directory is: {self.__directory}")
+      self.log.log_info(f"Init Logger", root_directory = self.__root__)
 
     return self.__log
 
@@ -117,7 +121,7 @@ class Tikal:
     return password
 
   def get_file(self, loc):
-    return path.join(self.__directory, loc)
+    return path.join(self.__root__, loc)
 
   def log_info(self, *args, **kwargs):
     return self.log.log_info(*args, **kwargs)
@@ -125,9 +129,9 @@ class Tikal:
   def get_directory(self, loc=None, create=False):
 
     if loc is None:
-      directory = self.__directory
+      directory = self.__root__
     else:
-      directory = path.join(self.__directory, loc)
+      directory = path.join(self.__root__, loc)
 
     if not create:
       return directory

@@ -106,7 +106,7 @@ let
       };
       uid-each = store-path-to-key "${each-nahual-script}";
       uid-main = store-path-to-key "${main-script}";
-      packages = { universe, ...}:
+      packages = { universe, ... }:
         let
           main = xsh.write-script {
             name = "main.xsh";
@@ -155,7 +155,7 @@ let
     name = "sync_test";
     packages = {
       sync_test = {
-        __init__ = ./sync_test/__init__.py;
+        core = ./sync_test/core.xsh;
       };
       sync_lib = {
         core = ./sync_lib/core.xsh;
@@ -167,6 +167,7 @@ let
     , tests
     , universe ? {}
     , vars ? {}
+    , to-nix-tests ? null
     }:
     let
       universe-instance =
@@ -214,14 +215,14 @@ let
       tests-text = tests { vars = xsh-vars.bindings; };
     in
       xsh.test {
-        inherit name;
+        inherit name to-nix-tests;
         pythonpath = [
           script.pythonpath
           sync-lib.pythonpath
         ];
         script = ''
           import unittest
-          from sync_test import TikalMock
+          from sync_test.core import TikalMock
 
           ${test-tikal} = None
           ${test-case} = None
@@ -229,9 +230,17 @@ let
 
           class SyncTestCaseBase(unittest.TestCase):
 
+            def __init__(self, *args, **kwargs):
+              super().__init__(*args, **kwargs)
+              self.__sync_run_count = 0
+
             @property
             def tikal(self):
               return self.__tikal
+
+            @property
+            def sync_run_count(self):
+              return self.__sync_run_count
 
             def setUp(self):
               self.__tikal = TikalMock()
@@ -242,6 +251,7 @@ let
               import ${name} as sync_script
               ${test-context} = test_context
               sync_script.__main__(self.__tikal)
+              self.__sync_run_count += 1
 
           ${xsh-vars.text}
           ${tests-text}

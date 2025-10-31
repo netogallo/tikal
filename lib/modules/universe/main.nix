@@ -25,11 +25,11 @@ let
       }
   ;
   scope = lib.makeScope pkgs.newScope (self: {
-    inherit pkgs lib tikal universe;
+    inherit pkgs lib tikal universe flake-context;
     tikal-foundations = self.callPackage ../shared/tikal-foundations.nix {};
     tikal-log = self.callPackage ../shared/tikal-log.nix {};
     nahual-pkgs = nahual-pkgs self;
-    tikal-store-lock = self.callPackage ../shared/tikal-store-lock.nix {};
+    tikal-store-lock = self.callPackage ./tikal-store-lock.nix {};
   });
 in
   scope

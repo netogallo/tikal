@@ -6,11 +6,14 @@ from sync_lib.core import LogLevel, Logger, Tikal
 
 def is_matching_log(query, entry):
     from fnmatch import fnmatch
-    return all(
-        value is not None and fnmatch(str(value), query_value)
-        for key,query_value in query.items()
-        for value in [entry.get(key)]
-    )
+
+    for key,query_value in query.items():
+        value = entry.get(key)
+
+        if value is None or not fnmatch(str(value), query_value):
+            return False
+
+    return True
 
 class TestLogger(Logger):
     def __init__(
@@ -27,10 +30,7 @@ class TestLogger(Logger):
         self.__logs.append(entry)
 
     def get_matching_logs(self, **kwargs):
-        return [
-            log
-            for log in self.__logs if is_matching_log(kwargs, log)
-        ]
+        return [log for log in self.__logs if is_matching_log(kwargs, log)]
 
 class TikalMock(Tikal):
     """
@@ -41,6 +41,13 @@ class TikalMock(Tikal):
 
     def __init__(self):
         super().__init__(LogLevel.Debug)
+        workdir = $TIKAL_XSH_TESTS_WORKDIR
+        self.__root = f"{workdir}/sync"
+        mkdir -p f"{self.__root}"
+
+    @property
+    def __root__(self):
+        return self.__root
 
     def __create_logger__(self, loglevel):
         return TestLogger(loglevel)

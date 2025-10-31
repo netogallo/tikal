@@ -27,12 +27,10 @@ let
   inherit (tikal.prelude.template) template;
   inherit (tikal.xonsh) xsh;
   inherit (lib) types mkIf mkOption;
-  inherit (tikal.prelude) test;
-  inherit (tikal.store.lock) hash-key;
+  inherit (tikal.prelude) test trace;
+  inherit (tikal.store.lock) get-resource-path hash-key lockfile-name
+    lockdir-name lockstore-name;
 
-  lockdir-path = "public/lock";
-  lockfile-path = "${lockdir-path}/lockfile.json";
-  lockstore-path = "${lockdir-path}/store";
   to-lock-entry = { key, derive }:
     let
       hashed-key = hash-key key;
@@ -59,90 +57,127 @@ let
       }
   ;
   create-sync-script = locks:
-    let
-      x = 5;
-    in
-      nahual-sync-script {
-        name = "tikal_store_lock";
-        description = ''
-          This sync script is responsible for creating locked store paths inside the Tikal configuration.
-          A locked store path is simply a copy of a regular store path into the public part of the Tikal
-          configuration. A store lockfile identifies each of the paths with a unique and stable key.
-          The idea is that the output of various, normally impure, derivations can be shared accross
-          different machines.
-        '';
-        vars = { inherit locks; };
-        script = { vars, ... }: template ./tikal-store-lock/main.xsh vars;
-      }
+    nahual-sync-script {
+      name = "tikal_store_lock";
+      description = ''
+        This sync script is responsible for creating locked store paths inside the Tikal configuration.
+        A locked store path is simply a copy of a regular store path into the public part of the Tikal
+        configuration. A store lockfile identifies each of the paths with a unique and stable key.
+        The idea is that the output of various, normally impure, derivations can be shared accross
+        different machines.
+      '';
+      vars = { inherit locks lockdir-name lockfile-name lockstore-name; };
+      script = { vars, ... }: template ./tikal-store-lock/main.xsh vars;
+    }
   ;
+  store-lock-tests = { tests, locks, universe, to-nix-tests ? null }: sync-script-tests {
+    inherit to-nix-tests;
+    vars = {
+      inherit lockdir-name lockfile-name lockstore-name;
+      locks = to-lock-config locks;
+    };
+    sync-script = {
+      name = "tikal_store_lock_test";
+      description = "Test script for store locks";
+      script = { vars, ... }: template ./tikal-store-lock/main.xsh vars;
+    };
+    tests = args@{ vars, ... }:
+      ''
+      class StoreLockTestCaseBase(SyncTestCaseBase):
+
+        @property
+        def input_locks(self):
+          return ${vars.locks}
+
+        def get_lock_paths(self):
+          if self.sync_run_count < 1:
+            raise Exception("You must call '__run_sync_script__' before attempting to read the resulting lockfile.")
+
+          return self.tikal.log.get_matching_logs(message = "Lock Paths")
+
+        def get_written_lock(self, index = 0):
+          import json
+          lock_paths = self.get_lock_paths()[index]
+          lock_file = lock_paths['lock_file']
+          lock_store_directory = lock_paths['lock_store_directory']
+
+          with open(lock_file, 'r') as fp:
+            return json.load(fp)
+
+      ${tests args}
+      ''
+    ;
+  };
 in
   test.with-tests
   {
     inherit __doc__ create-sync-script create-locked-derivations to-lock-config;
   }
   {
-    tikal.store-lock = sync-script-tests {
-      universe = {
-        nahuales = {};
-      };
-      vars = {
-        locks = to-lock-config [
+    tikal.store-lock =
+      let
+        locks = [
           {
             key = { name = "lock1"; };
             derive = pkgs.writeTextFile { name = "lock1"; text = "lock1"; destination = "/lock1"; };
           }
         ];
-      };
-      sync-script = {
-        name = "tikal_store_lock_test";
-        description = "Test script for store locks";
-        script = { vars, ... }: template ./tikal-store-lock/main.xsh vars;
-      };
-      tests = { vars, ... }: with vars;
-        ''
-        class TestStoreLock(SyncTestCaseBase):
+      in
+        store-lock-tests {
+          universe = {
+            nahuales = {};
+          };
+          inherit locks;
+          tests = { vars, ... }:
+            ''
+            class TestStoreLock(StoreLockTestCaseBase):
 
-          def test_lock_derivation(self):
-            import json
-            from os import path
+              def test_lock_derivation(self):
+                import json
+                from os import path
 
-            self.__run_sync_script__()
+                self.__run_sync_script__()
 
-            lock_paths = self.tikal.log.get_matching_logs(message = "Lock Paths")
-            self.assertEqual(1, len(lock_paths))
+                lock_paths = self.get_lock_paths()
+                self.assertEqual(1, len(lock_paths))
 
-            lock_file = lock_paths[0]['lock_file']
-            lock_store_directory = lock_paths[0]['lock_store_directory']
-            with open(lock_file, 'r') as fp:
-              written_lock = json.load(fp)
-            input_locks = ${locks}
+                written_lock = self.get_written_lock()
+                input_locks = ${vars.locks}
 
-            self.assertTrue(
-              len(written_lock) == 1,
-              f"Expected 1 item in the lockfile '{lock_file}'"
-            )
+                self.assertTrue(len(written_lock) == 1, f"Expected 1 item in the lockfile")
 
-            for uid,input_lock in input_locks.items():
+                for uid,input_lock in input_locks.items():
 
-              self.assertTrue(
-                uid in written_lock,
-                "Lock was not written to store lock file"
-              )
+                  self.assertTrue(uid in written_lock, "Lock was not written to store lock file")
 
-              written_lock_path = written_lock[uid]
-              derive = input_lock.derive
+                  written_lock_path = written_lock[uid]
+                  derive = input_lock.derive
 
-              self.assertTrue(
-                written_lock_path in derive,
-                f"Expected '{written_lock_path}' to appear in '{derive}'"
-              )
+                  self.assertTrue(written_lock_path in derive, f"Expected '{written_lock_path}' to appear in '{derive}'")
 
-              lock_store_written_path = path.join(lock_store_directory, written_lock_path)
-              self.assertTrue(
-                path.isdir(lock_store_written_path),
-                f"Expected '{lock_store_written_path}' to be a directory."
-              )
-        ''
-      ;
-    };
+                  lock_store_written_path = path.join(lock_store_directory, written_lock_path)
+                  self.assertTrue(path.isdir(lock_store_written_path), f"Expected '{lock_store_written_path}' to be a directory.")
+            ''
+          ;
+          to-nix-tests = { results, output, ... }:
+            results //
+            {
+              "Lock output matches key." = { _assert, ... }:
+                let
+                  test-get-resource-path =
+                    get-resource-path { lockdir-root = "${output}/workdir/public"; };
+                  check = { key, ... }:
+                  _assert.true
+                    (lib.pathIsRegularFile (test-get-resource-path key))
+                    ''
+                      Could not find the locked store path at "${test-get-resource-path key}"
+                      for key "${trace.debug-print key}".
+                    ''
+                  ;
+                in
+                  _assert.all (map check locks)
+              ;
+            }
+          ;
+        };
   }

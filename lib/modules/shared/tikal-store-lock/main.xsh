@@ -8,13 +8,16 @@ from subprocess import CalledProcessError
 tikal = ${tikal-context}
 universe = ${tikal-universe}
 
-lock_directory_path = path.join(universe.public_dir, "tikal_store_lock")
-lock_store_directory_path = path.join(lock_directory_path, "store")
+lock_directory_name = ${lockdir-name}
+lock_file_name = ${lockfile-name}
+lock_store_name = ${lockstore-name}
+lock_directory_path = path.join(universe.public_dir, lock_directory_name)
+lock_store_directory_path = path.join(lock_directory_path, lock_store_name)
 
 # Load the existing store lockfile. Load an empty dictionary if missing
 lock_directory = tikal.get_directory(lock_directory_path, create=True)
 lock_store_directory = tikal.get_directory(lock_store_directory_path, create=True)
-lock_file = path.join(lock_directory, "tikal_store_lock.json")
+lock_file = path.join(lock_directory, lock_file_name)
 
 tikal.log.log_debug(
   "Lock Paths",
@@ -41,7 +44,7 @@ def is_lockpath_available(key):
     if key not in store_lock:
         return False
 
-    dest_name = store_locks[key]
+    dest_name = store_lock[key]
     dest_path = path.join(lock_store_directory, dest_name)
 
     # Key is already in the store lockfile. Check

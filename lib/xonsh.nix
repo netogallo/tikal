@@ -227,7 +227,7 @@ let
   write-script-bin = makeXshScript (
     write: args@{ name, ... }: pkgs.writeScriptBin name (write args)
   );
-  test-xsh = { name, pythonpath ? [], script }:
+  test-xsh = { name, pythonpath ? [], script, to-nix-tests ? null }:
     let
       script-txt =
         if lib.isFunction script
@@ -306,15 +306,20 @@ let
         ];
         pythonpath = [ test-packages.pythonpath ] ++ pythonpath;
       };
-      test-outcome = pkgs.runCommand "${name}-outcome" {} ''
+      tests-output = pkgs.runCommand "${name}-output" {} ''
         set +e
-        export TIKAL_XSH_TESTS_RESULTS=$out
+
+        export TIKAL_XSH_TESTS_RESULTS="$out/result.txt"
+        export TIKAL_XSH_TESTS_WORKDIR="$out/workdir"
+
+        mkdir -p $TIKAL_XSH_TESTS_WORKDIR
+
         ${test-script}/bin/${name} &> output.txt
         result="$?"
 
-        if [ ! -f "$out" ]; then
+        if [ ! -f "$TIKAL_XSH_TESTS_RESULTS" ]; then
           error=$(cat output.txt)
-          ${pkgs.jq}/bin/jq -n --arg message "$error" '{${name}: { success: false, message: $message }}' > $out
+          ${pkgs.jq}/bin/jq -n --arg message "$error" '{${name}: { success: false, message: $message }}' > $TIKAL_XSH_TESTS_RESULTS 
         fi
 
         if [ "$result" != 0 ]; then
@@ -324,16 +329,18 @@ let
         exit "$result"
       '';
       tests = do [
-        test-outcome
-        "$>" builtins.readFile
-        "|>" builtins.unsafeDiscardStringContext
+        (builtins.readFile "${tests-output}/result.txt")
+        "$>" builtins.unsafeDiscardStringContext
         "|>" builtins.fromJSON
       ];
       mk-test = name: { success, message }: { _assert, ... }:
         _assert.check success message
       ;
+      tests-results = lib.mapAttrs mk-test tests;
     in
-      lib.mapAttrs mk-test tests
+      if to-nix-tests == null
+      then tests-results
+      else to-nix-tests { results = tests-results; output = tests-output; } 
   ;
 in
   {

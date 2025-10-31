@@ -1,5 +1,6 @@
-{ lib, pkgs, ... }:
+{ lib, log, pkgs, ... }:
 let
+  log' = log.add-context { path = ./template.nix; };
   to-args-string = args:
     let
       args-def = lib.concatStringsSep "," args;
@@ -18,13 +19,14 @@ let
       body = "''\n${content}\n''";
       call-context = get-call-context { inherit context content; };
       args = to-args-string call-context.args;
-      target = pkgs.writeTextFile {
+      target' = pkgs.writeTextFile {
         name = "${builtins.baseNameOf path}-template.nix";
         text = ''
         ${args}:
         ${body}
         '';
       };
+      target = log'.log-info "Template path ${target'}" target';
     in
       call-context.call "${target}" context
   ;
