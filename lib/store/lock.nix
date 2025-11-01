@@ -1,6 +1,6 @@
 { lib, tikal, ... }:
 let
-  inherit (tikal.prelude) do trace;
+  inherit (tikal.prelude) do debug-print;
   inherit (tikal.prelude.test) with-tests;
 
   lockfile-name = "tikal_store_lock.json";
@@ -19,24 +19,28 @@ let
       ]
   ;
   get-root-paths = lockdir-root:
-    {
+    rec {
       lockdir-path = "${lockdir-root}/${lockdir-name}";
-      lockfile-path = "${lockdir-root}/${lockfile-name}";
+      lockfile-path = "${lockdir-path}/${lockfile-name}";
+      lockstore-path = "${lockdir-path}/${lockstore-name}";
     }
   ;
   get-resource-path = { lockdir-root }: key:
     let
-      inherit (get-root-paths) lockdir-path lockfile-path;
+      inherit (get-root-paths lockdir-root) lockdir-path lockfile-path lockstore-path;
       hashed-key = hash-key key;
-      lockfile = builtins.fromJSON (builtins.readFile lockfile-path);
-      path-relative = lockfile.${key};
+      lockfile =
+        builtins.fromJSON (
+          builtins.unsafeDiscardStringContext (
+            builtins.readFile lockfile-path));
+      path-relative = lockfile.${hashed-key};
       error = ''
-        The key "${trace.debug-print key}" is not available in
+        The key "${debug-print key}" is not available in
         the store lockfile at "${lockfile-path}".
       '';
     in
-      if lib.hasAttr key lockfile
-      then "${lockdir-path}/${path-relative}"
+      if lib.hasAttr hashed-key lockfile
+      then "${lockstore-path}/${path-relative}"
       else throw error
   ;
 in

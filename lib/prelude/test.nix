@@ -64,23 +64,30 @@ let
   _assert = { name }:
     let
       run = outcome: message:
-        if outcome
-        then {
-          success = true;
-          message = ''
-            Test "${name}"
+        let
+          render-message = message':
+            if outcome
+            then
+              ''
+              Test "${name}"
               Result: Ok
-          '';
-        }
-        else {
-          success = false;
-          message = ''
-            Test "${name}"
-              Result: Fail
-              Message:
-                ${message}
-          '';
-        }
+              ''
+            else
+              ''
+              Test "${name}"
+                Result: Fail
+                Message:
+                  ${message'}
+              ''
+          ;
+        in
+          {
+            message = render-message message;
+            success = outcome;
+            __functor = self: new-message:
+            self //
+            { message = render-message new-message; };
+          }
       ;
     in
       {
@@ -102,7 +109,7 @@ let
   };
   run-test = { name, test }:
     match (test (test-context name)) [
-      ({ success, message }@result: result)
+      ({ success, message, ... }: { inherit success message; })
       match.otherwise (result:
         trace.throw-print
         {

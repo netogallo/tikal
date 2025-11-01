@@ -22,12 +22,11 @@ let
   returned as is, otherwise it will be computed and added to the lock file using
   the "sync" script.
   '';
-  inherit (tikal.prelude) do;
+  inherit (tikal.prelude) do test debug-print;
   inherit (tikal.sync) nahual-sync-script sync-script sync-script-tests;
   inherit (tikal.prelude.template) template;
   inherit (tikal.xonsh) xsh;
   inherit (lib) types mkIf mkOption;
-  inherit (tikal.prelude) test trace;
   inherit (tikal.store.lock) get-resource-path hash-key lockfile-name
     lockdir-name lockstore-name;
 
@@ -89,17 +88,21 @@ let
         def input_locks(self):
           return ${vars.locks}
 
-        def get_lock_paths(self):
+        def get_lock_paths(self, index = None):
           if self.sync_run_count < 1:
             raise Exception("You must call '__run_sync_script__' before attempting to read the resulting lockfile.")
 
-          return self.tikal.log.get_matching_logs(message = "Lock Paths")
+          matches = self.tikal.log.get_matching_logs(message = "Lock Paths")
+
+          if index is None:
+            return matches
+          else:
+            return matches[index]
 
         def get_written_lock(self, index = 0):
           import json
           lock_paths = self.get_lock_paths()[index]
           lock_file = lock_paths['lock_file']
-          lock_store_directory = lock_paths['lock_store_directory']
 
           with open(lock_file, 'r') as fp:
             return json.load(fp)
@@ -140,6 +143,7 @@ in
 
                 lock_paths = self.get_lock_paths()
                 self.assertEqual(1, len(lock_paths))
+                lock_store_directory = lock_paths[0]['lock_store_directory']
 
                 written_lock = self.get_written_lock()
                 input_locks = ${vars.locks}
@@ -165,14 +169,15 @@ in
               "Lock output matches key." = { _assert, ... }:
                 let
                   test-get-resource-path =
-                    get-resource-path { lockdir-root = "${output}/workdir/public"; };
+                    get-resource-path
+                    {
+                      lockdir-root = "${output}/workdir/sync/.tikal/public";
+                    }
+                  ;
                   check = { key, ... }:
-                  _assert.true
-                    (lib.pathIsRegularFile (test-get-resource-path key))
-                    ''
-                      Could not find the locked store path at "${test-get-resource-path key}"
-                      for key "${trace.debug-print key}".
-                    ''
+                    _assert.true
+                    (lib.pathExists (test-get-resource-path key))
+                    ''Could not find the locked store path at "${test-get-resource-path key}" for key "${debug-print key}".''
                   ;
                 in
                   _assert.all (map check locks)

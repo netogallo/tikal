@@ -245,6 +245,7 @@ let
           };
         };
       };
+      test-module-name = "tikal_xsh_tests.tests";
       test-support = ''
         import unittest
         import json
@@ -267,7 +268,7 @@ let
               tb_str = "".join(traceback.format_tb(tb))
               message = f"{val}\n{ty}\n{tb_str}"
 
-            key = f"{test.id()}"
+            key = f"{test.id()}".replace(".", "_")
             self.__results[key] = { 'success': success, 'message': message }
         
           def addSuccess(self, test):
@@ -296,7 +297,7 @@ let
             result.save_tikal()
             return result
 
-        unittest.main(module='tikal_xsh_tests.tests', testRunner=CollectingRunner)
+        unittest.main(module='${test-module-name}', testRunner=CollectingRunner)
         ''
       ;
       test-script = write-script-bin {
@@ -340,7 +341,11 @@ let
     in
       if to-nix-tests == null
       then tests-results
-      else to-nix-tests { results = tests-results; output = tests-output; } 
+      else
+        to-nix-tests {
+          results = tests-results;
+          output = tests-output;
+        }
   ;
 in
   {
