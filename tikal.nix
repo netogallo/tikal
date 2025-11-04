@@ -28,6 +28,10 @@ let
   log = scope.tikal.prelude.log.add-context { file = ./tikal.nix; };
 
   universe =
+    # The universe definition. This can be annything which
+    # can be treated as a nixos module, including (1) path
+    # to a nix file (2) attribute set (3) function, among
+    # other values.
     spec:
     {
       # The root path of the flake. Should always be ./

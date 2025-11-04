@@ -34,7 +34,7 @@ let
         ${nahual} = {
           derive =
             tikal-secrets.to-nahual-secret
-            { inherit nahual text; }
+            { inherit name nahual text; }
           ;
           key = {
             module = "tikal-secrets";
