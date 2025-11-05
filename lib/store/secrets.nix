@@ -112,7 +112,7 @@ let
 in
   with-tests
   {
-    inherit to-nahual-secret;
+    inherit to-nahual-secret to-decrypt-script;
   }
   {
     tikal.store.secrets = {};

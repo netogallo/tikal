@@ -31,16 +31,7 @@ let
   to-all-nahuales-secret = name: { text, ... }:
     let
       to-nahual-secret = nahual: {
-        ${nahual} = {
-          derive =
-            tikal-secrets.to-nahual-secret
-            { inherit name nahual text; }
-          ;
-          key = {
-            module = "tikal-secrets";
-            inherit name nahual;
-          };
-        };
+        ${nahual} = tikal-secrets.to-nahual-secret { inherit name nahual text; };
       };
     in
       lib.map to-nahual-secret nahuales
@@ -51,20 +42,22 @@ let
     "|>" lib.attrValues
     "|>" lib.foldAttrs (item: acc: [item] ++ acc) []
   ];
-  to-nahual-secrets-module = name: secrets:
+  secrets-locks = lib.concat (lib.attrValues locks-all-nahuales);
+
+  to-nahual-secrets-module = nahual: secrets:
     let
       is-enabled = lib.length secrets > 0;
     in
       {
         config = mkIf is-enabled {
-          system.activationScripts.tikal-secrets-activate =
-            tikal-secrets.activation-script-for secrets;
+          system.activationScripts.tikal-secrets-activate.text =
+            secrets-activation-script { inherit nahual secrets; }
+          ;
         };
       }
   ;
   modules-all-nahuales =
     lib.mapAttrs to-nahual-secrets-module locks-all-nahuales;
-  secrets-locks = lib.concat (lib.attrValues locks-all-nahuales);
   secrets-modules = modules-all-nahuales;
 in
   {

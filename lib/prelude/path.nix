@@ -1,5 +1,6 @@
 { pkgs, lib, test, trace, string }:
 let
+  inherit (trace) debug-print;
   inherit (lib) lists strings;
   extension-of-checked = options: path:
     let
@@ -7,11 +8,29 @@ let
     in
       lib.lists.findFirst
       (ext: string.is-suffix-of ".${ext}" name)
-      (throw "The file '${path}' does not have the extensions '${trace.debug-print options}'")
+      (throw "The file '${path}' does not have the extensions '${debug-print options}'")
       options
   ;
   is-file-reference = file:
     (lib.isPath file || lib.isDerivation file) && lib.pathIsRegularFile file
+  ;
+  assert-path = lib.makeOverridable(
+    { is-file, is-directory, error }: path':
+    let
+      check =
+        (lib.isPath path' || lib.isDerivation path')
+        && (lib.pathIsRegularFile path' || !is-file)
+        && (lib.pathIsDirectory path' || !is-directory)
+      ;
+    in
+      if check
+      then path'
+      else throw (error { path = path'; path-as-string = debug-print path'; }))
+    {
+      is-file = false;
+      is-directory = false;
+      error = { path, ... }: "The value '${debug-print path}' is not a valid path.";
+    }
   ;
 in
   test.with-tests

@@ -25,7 +25,7 @@ let
       }
   ;
   to-nahual =
-    ctx: name: value:
+    ctx: name: _value:
     let
       inherit (get-nahual-dirs ctx name)
         private-root

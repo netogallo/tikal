@@ -40,7 +40,7 @@ decrypt_tikal_master_key() {
   if [ "$RESULT" == "0" ]; then
     mkdir -p /run/keys/tikal
     mv "$TMP_KEY" /run/keys/tikal/id_tikal
-    echo "Success! Writing key to ${tikal-paths.tikal-main}"
+    echo "Success! Decrypted key to /run/keys/tikal/id_tikal"
     return 0
   else
     echo "Incorrect password was supplied. Try again"

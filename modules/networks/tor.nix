@@ -3,20 +3,52 @@
 , lib
 , tikal
 , pkgs
-, nahual-pkgs
 , universe-context
+, tikal-secrets
 , ...
 }:
 let
+  inherit (tikal.secrets) get-secret-path;
   inherit (tikal.xonsh) xsh;
   inherit (tikal.sync) nahual-sync-script;
   inherit (lib) types mkIf mkOption;
   inherit (pkgs) gettext;
-  inherit (nahual-pkgs config.nahuales) tikal-secrets;
+  #inherit (nahual-pkgs config.nahuales) tikal-secrets;
   log = tikal.prelude.log.add-context { file = ./tor.nix; };
   tor-sync = pkgs.tor.overrideAttrs (new: old: {
     patches = old.patches ++ [ ./tor/0001-Command-line-option-to-pre-initialize-files.patch ];
   });
+
+  tikal-onion-service-torrc =
+    pkgs.writeText "torrc" ''
+      HiddenServiceDir $private
+      HiddenServicePort 22 127.0.0.1:22
+      ''
+  ;
+  tikal-onion-service-secrets-script =
+    ''
+    mkdir -p $public
+    echo $USER
+    workdir=$(mktemp -d)
+    cat "${tikal-onion-service-torrc}" \
+      | private="$private" ${gettext}/bin/envsubst \
+      > "$workdir/torrc"
+    cat "$workdir/torrc"
+    echo "${tor-sync}"
+    ${tor-sync}/bin/tor --init-files -d "$workdir" -f "$workdir/torrc"
+
+    # Tor does not want exectue permissions on directory
+    # However, this will be compressed with tar, so
+    # execution permission will be needed
+    chmod +x $private
+    cp $private/hs_*_secret_key $private/hs_private_key
+    mv $private/hostname $public/
+    mv $private/hs_*_public_key $public/
+    rm -rf $private/authorized_clients
+    echo "canary" > "$private/canary"
+    cp $workdir/torrc $private/
+    ''
+  ;
 
   tikal-onion-service = name: config:
     let
@@ -115,8 +147,26 @@ let
       }
   ;
 
+  tikal-tor-set-hostname = nahual:
+    let
+      public = get-secret-public-path {
+        inherit nahual;
+        name = tikal-tor-secret-name;
+      };
+    in
+      ''
+      export TOR_${nahual}=$(cat ${public}/hostname)
+      ''
+  ;
 
-  tor-network-module = name: config:
+  tikal-tor-set-hostnames = do [
+    lib.attrNames config.nahuales
+    "$>" map tikal-tor-set-hostname
+    "|>" lib.concatStringsSep "\n"
+    "|>" pkgs.writeScriptBin "tikal-tor-set-hostnames"
+  ];
+
+  tor-network-module = nahual: _config:
     # This produces a nixos module which should
     # do the following:
     # 1. Enables tor
@@ -125,25 +175,17 @@ let
     # 4. Creates scripts to easily ssh into
     #    other servers via tor
     let
-      onion-services = tikal-onion-services.${name};
-      secrets = onion-services.secrets;
-      set-hostname = name': onion-service: 
-        ''
-          export TOR_${name'}=$(cat ${onion-service.secrets.tikal.public}/hostname)
-        ''
-      ;
+      onion-service-private-directory = get-secret-private-path {
+        name = tikal-tor-secret-name;
+      };
+      secretKey = "${onion-service-private-directory}/hs_private_key";
       tor-ssh = to-tor-ssh config;
-      set-hostnames = lib.mapAttrsFlatten set-hostname tikal-onion-services;
-      tikal-tor-package = pkgs.writeScriptBin "tikal-tor" ''
-        ${lib.concatStringsSep "\n" set-hostnames}
-      '';
     in
     {
-      imports = [ onion-services.module ];
       config = {
         environment.systemPackages = [
-          tikal-tor-package
-          (log.log-debug { nahual = name; } "tor-ssh: ${tor-ssh}" tor-ssh)
+          tikal-tor-set-hostnames
+          (log.log-debug { inherit nahual; } "tor-ssh: ${tor-ssh}" tor-ssh)
         ];
         services.tor = {
           enable = true;
@@ -157,8 +199,8 @@ let
           };
           
           relay.onionServices = {
-            "tikal" = {
-              secretKey = "${secrets.tikal.private}/hs_private_key";
+            "${tikal-tor-secret-name}-ssh" = {
+              inherit secretKey;
               map = [ { port = 22; target = { port = 22; }; } ];
             };
           };
@@ -168,26 +210,6 @@ let
   ;
 
   tor-modules = name: config: lib.map (mod: mod name config) [ tor-network-module ];
-
-  sync-script = nahual-sync-script {
-    name = "tikal_host_onion_service";
-    description = ''
-    This script does the following:
-      1. Create the public keys for the onion services
-         of each of the nahuales. This is achieved using
-         a patched tor server which initializes onion
-         services w/o opening any network connections.
-      2. Encrypt and copy these secrets to the public
-         directory of each Nahual. This way, the nahuales
-         can be built and the private keys will be available
-         in each of the images.
-    '';
-    each-nahual = { vars, ... }: with vars;
-      ''
-      name=${nahual-name}
-      print(f"Tor sync script {name}")
-      '';
-  };
   tor-cfg = config.networks.tor;
 in
 {
@@ -204,11 +226,14 @@ in
   config = mkIf tor-cfg.enable {
     
     tikal = {
-      sync.scripts = [
-        sync-script
-      ];
-
       build.modules = lib.mapAttrs tor-modules config.nahuales;
     };
+
+    secrets.all-nahuales = {
+      ${tikal-tor-secret-name} = {
+        text = tikal-onion-service-secrets-script;
+      };
+    };
+
   };
 }
