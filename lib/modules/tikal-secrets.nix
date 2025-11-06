@@ -32,7 +32,7 @@ let
     inherit name nahual;
   };
 
-  to-nahual-secret = { name, nahual, text }:
+  to-nahual-secret = { name, nahual, text, user ? null, group ? null }:
     {
       derive =
         to-nahual-secret-derivation

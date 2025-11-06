@@ -3,7 +3,7 @@ let
   inherit (lib) types mkOption;
   secret = {
     text = mkOption {
-      types = types.str;
+      type = types.str;
       description = ''
         This option is a bash program that generates the secret.
         This program will be executed in order to generate the
@@ -24,14 +24,33 @@ let
         alongside the secret (ie. public keys).
       '';
     };
+    user = mkOption {
+      type = types.nullOr types.str;
+      description = ''
+        The ownership that the decrypted secret will have on the
+        running NixOs system.
+      '';
+      default = null;
+    };
+    group = mkOption {
+      type = tpes.nullOr types.str;
+      description = ''
+        The group that will be assigned to the folder containing
+        the decrypted system on the running NixOs system.
+      '';
+      default = null;
+    };
   };
   is-enabled = true;
   nahuales = lib.attrNames config.nahuales;
   config-all-nahuales = config.secrets.all-nahuales;
-  to-all-nahuales-secret = name: { text, ... }:
+  to-all-nahuales-secret = name: { text, user, group, ... }:
     let
       to-nahual-secret = nahual: {
-        ${nahual} = tikal-secrets.to-nahual-secret { inherit name nahual text; };
+        ${nahual} =
+          tikal-secrets.to-nahual-secret {
+            inherit name nahual text user group;
+          };
       };
     in
       lib.map to-nahual-secret nahuales
