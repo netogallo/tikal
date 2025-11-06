@@ -4,7 +4,7 @@
 # These get placed into a configuration directory which becomes part of the
 # flake. This module is used to refer to items in the config directory of
 # the flake.
-{ flake-context, ... }:
+{ lib, tikal, flake-context, ... }:
 let
   inherit (tikal.prelude.path) assert-path;
   _legacy-nahual-flake-config = nahual:
@@ -19,10 +19,10 @@ let
       keys = (_legacy-nahual-flake-config nahual).public.tikal-keys;
       check = assert-path.override {
         is-file = true; 
-        error = { path-as-string, ... }: "The key at '${path-as-string}' for the nahual '${nahhual}' could not be found. Did you run 'sync' and 'git add .'";
+        error = { path-as-string, ... }: "The key at '${path-as-string}' for the nahual '${nahual}' could not be found. Did you run 'sync' and 'git add .'";
       };
     in
-      lib.mapAttrs check { tikal-public-key = tikal_main_pub; }
+      lib.mapAttrs check { tikal-public-key = keys.tikal_main_pub; }
   ;
   tikal-public-key = args: (tikal-flake-keys args).tikal-public-key;
 in

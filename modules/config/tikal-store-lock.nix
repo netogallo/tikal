@@ -6,11 +6,9 @@ let
   is-enabled = lib.length store-lock.items > 0;
   sync-script =
     create-sync-script (to-lock-config store-lock.items);
-  store-lock-definition = {
-    options = {
-      key = mkOption { type = types.attrsOf types.str; };
-      derive = mkOption { type = types.package; };
-    };
+  store-lock-definition.options = {
+    key = mkOption { type = types.attrsOf types.str; };
+    derive = mkOption { type = types.package; };
   };
 in
   {

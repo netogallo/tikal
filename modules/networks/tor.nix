@@ -7,7 +7,8 @@
 , ...
 }:
 let
-  inherit (tikal.secrets) get-secret-path;
+  inherit (tikal.prelude) do;
+  inherit (tikal-secrets) get-secret-public-path get-secret-private-path;
   inherit (tikal.xonsh) xsh;
   inherit (lib) types mkIf mkOption;
   inherit (pkgs) gettext;

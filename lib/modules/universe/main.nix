@@ -28,8 +28,11 @@ let
     inherit pkgs lib tikal universe flake-context;
     tikal-foundations = self.callPackage ../shared/tikal-foundations.nix {};
     tikal-log = self.callPackage ../shared/tikal-log.nix {};
-    nahual-pkgs = nahual-pkgs self;
+    # nahual-pkgs = nahual-pkgs self;
     tikal-store-lock = self.callPackage ./tikal-store-lock.nix {};
+    tikal-secrets = self.callPackage ../tikal-secrets.nix {};
+    tikal-nixos-context = self.callPackage ../tikal-nixos-context.nix {};
+    tikal-flake-context = self.callPackage ../tikal-flake-context.nix {};
   });
 in
   scope

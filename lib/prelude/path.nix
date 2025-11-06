@@ -35,7 +35,7 @@ let
 in
   test.with-tests
   {
-    inherit extension-of-checked is-file-reference;
+    inherit assert-path extension-of-checked is-file-reference;
   }
   {
     prelude.path = {

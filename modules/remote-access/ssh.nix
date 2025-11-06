@@ -4,7 +4,7 @@
 , config
 , lib
 , tikal
-, tika-secrets
+, tikal-secrets
 , ...
 }:
 let
@@ -65,7 +65,7 @@ in
     };
 
     config = mkIf tikal-ssh-config.enable {
-      tikal.secrets.all-nahuales = {
+      secrets.all-nahuales = {
         ${tikal-ssh-secret-name} = {
           text = gen-key-script;
           user = "nixos";

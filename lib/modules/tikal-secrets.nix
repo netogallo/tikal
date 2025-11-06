@@ -1,5 +1,6 @@
 {
   pkgs,
+  lib,
   tikal,
   tikal-store-lock,
   tikal-log,
@@ -11,11 +12,13 @@ let
   inherit (tikal-store-lock.universe) get-resource-path;
   inherit (tikal-log) logger;
   inherit (tikal.store) secrets;
+  inherit (tikal.prelude) do;
   inherit (tikal.prelude.test) with-tests;
   inherit (tikal-flake-context.tikal-secrets) tikal-public-key;
   inherit (tikal-nixos-context.tikal-secrets) tikal-private-key tikal-secrets-store-directory;
 
-  to-nahual-secret-derivation = { name, nahual, text, user ? null, group ? null }:
+  to-nahual-secret-derivation =
+    { name, nahual, text, user ? null, group ? null }:
     let
       tikal-key = tikal-public-key { inherit nahual; };
     in
@@ -42,8 +45,8 @@ let
     }
   ;
 
-  get-secret-store-path = { name, nahual }@key:
-    get-resource-path (get-secret-key secret-key)
+  get-secret-store-path = key:
+    get-resource-path (get-secret-key key)
   ;
 
   get-secret-public-path = key:
@@ -55,7 +58,7 @@ let
   ;
 
   to-decrypt-script = { name, nahual, ... }:
-    lock.to-decrypt-scritp {
+    secrets.to-decrypt-script {
       inherit tikal-private-key logger;
       secret = get-secret-store-path { inherit name nahual; };
       dest = get-secret-private-path { inherit name; };
@@ -97,7 +100,7 @@ let
         cp /run/keys/tikal/id_tikal "${tikal-private-key}"
       fi
 
-      ${decrypt-scripts}
+      ${decrypt-secrets}
       ${post-decryption-scripts}
       ''
   ;

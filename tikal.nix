@@ -21,6 +21,7 @@ let
         xonsh = self.callPackage ./lib/xonsh.nix {};
         sync = self.callPackage ./lib/sync/lib.nix {};
         store = self.callPackage ./lib/store.nix {};
+        syslog = self.callPackage ./lib/syslog.nix {};
       };
     }
   );

@@ -1,8 +1,11 @@
-{ lib, syslog, pkgs, nahuales, ... }:
+{ lib, tikal, pkgs, ... }:
 let
-  inherit (syslog) with-logger;
+  inherit (tikal.prelude) do;
+  inherit (tikal.prelude.test) with-tests;
+  inherit (tikal.syslog) with-logger;
   post-decrypt-scripts-directory = "post_decrypt";
-  set-ownership = { user ? null, group ? null, logger ? null }: { name, ... }:
+  set-ownership =
+    { user ? null, group ? null, logger ? null }: { name, ... }:
     let
       log = with-logger logger;
       # If a specific user/group is supplied, the
@@ -21,13 +24,13 @@ let
         chown -R ${owner} "$private"
         ${log} --tag=secrets -d "Setting ownership of ${name} to ${owner}" 
       '';
-      script = prelude.do [
+      script = do [
         ownership
         "$>" lib.map to-ownership-script
         "|>" lib.concatStringsSep "\n"
       ];
     in
-      pkgs.writeScript "post-decrypt-${name}" script;
+      pkgs.writeScript "post-decrypt-${name}" script
   ;
   # Create a derivation containing an encrypted secret. This function
   # accepts a public key and a procedure to generate a secret. It then
@@ -39,12 +42,14 @@ let
   # once the nixos activation script is used to decrypt these secrets.
   to-nahual-secret = { name, tikal-key, text, post-decrypt ? [] }:
     let
-      mk-secret = 
-        pkgs.writeScript name text;
+      mk-secret = pkgs.writeScript name text;
+      link-post-decrypt-scripts = script:
+        ''ln -s ${script} "$out/${post-decrypt-scripts-directory}/"''
+      ;
       post-decrypt = do [
         post-decrypt
         "$>" map (mk-script: mk-script { inherit name; })
-        "|>" map (script: ''ln -s ${script} "$out/${post-decript-scripts-directory}/" '')
+        "|>" map link-post-decrypt-scripts
         "|>" lib.concatStringsSep "\n"
       ];
     in
@@ -94,8 +99,8 @@ let
         -d "Decrypging '${dest}' from '${secret}/private' using '${tikal-private-key}'"
 
       # Perform decryption
-      ${pkgs.age}/bin/age -d -i "${tikal-private-key}" "${store-path}/private" \
-        | ${gnutar}/bin/tar -xC "${dest}"
+      ${pkgs.age}/bin/age -d -i "${tikal-private-key}" "${secret}/private" \
+        | ${pkgs.gnutar}/bin/tar -xC "${dest}"
 
       # Check if decryption was successful
       if [ "$?" != 0 ]; then

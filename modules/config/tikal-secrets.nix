@@ -1,7 +1,9 @@
-{ lib, config, tikal-secrets, ... }:
+{ lib, config, tikal, tikal-secrets, ... }:
 let
-  inherit (lib) types mkOption;
-  secret = {
+  inherit (tikal.prelude) do;
+  inherit (lib) types mkIf mkOption;
+  inherit (tikal-secrets) secrets-activation-script;
+  secret.options = {
     text = mkOption {
       type = types.str;
       description = ''
@@ -33,7 +35,7 @@ let
       default = null;
     };
     group = mkOption {
-      type = tpes.nullOr types.str;
+      type = types.nullOr types.str;
       description = ''
         The group that will be assigned to the folder containing
         the decrypted system on the running NixOs system.
@@ -57,11 +59,12 @@ let
   ;
   locks-all-nahuales = do [
     config-all-nahuales
-    "$>" lib.mapAttrs to-all-nahuales-secret)
+    "$>" lib.mapAttrs to-all-nahuales-secret
     "|>" lib.attrValues
+    "|>" lib.concatLists
     "|>" lib.foldAttrs (item: acc: [item] ++ acc) []
   ];
-  secrets-locks = lib.concat (lib.attrValues locks-all-nahuales);
+  secrets-locks = lib.concatLists (lib.attrValues locks-all-nahuales);
 
   to-nahual-secrets-module = nahual: secrets:
     let
@@ -89,6 +92,7 @@ in
           unique per nahual, but the logic to derive said
           secret will be shared among all nahuales.
         '';
+        default = {};
       };
     };
 
