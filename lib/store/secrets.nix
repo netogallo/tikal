@@ -46,7 +46,7 @@ let
       link-post-decrypt-scripts = script:
         ''ln -s ${script} "$out/${post-decrypt-scripts-directory}/"''
       ;
-      post-decrypt = do [
+      post-decrypt-text = do [
         post-decrypt
         "$>" map (mk-script: mk-script { inherit name; })
         "|>" map link-post-decrypt-scripts
@@ -63,8 +63,8 @@ let
         ${pkgs.gnutar}/bin/tar -cC "$PRIVATE" . | \
           ${pkgs.age}/bin/age -R "${tikal-key}" -o "$out/private" 
         mv "$WORKDIR/public" "$out/public"
-        mkdir ${post-decrypt-scripts-directory}
-        ${post-decrypt}
+        mkdir "$out/${post-decrypt-scripts-directory}"
+        ${post-decrypt-text}
         rm -rf "$WORKDIR"
         ''
   ;
@@ -117,7 +117,7 @@ let
 in
   with-tests
   {
-    inherit to-nahual-secret to-decrypt-script;
+    inherit to-nahual-secret to-decrypt-script set-ownership;
   }
   {
     tikal.store.secrets = {};

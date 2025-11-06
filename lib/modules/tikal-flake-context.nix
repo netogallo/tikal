@@ -17,7 +17,7 @@ let
   tikal-flake-keys = { nahual }:
     let
       keys = (_legacy-nahual-flake-config nahual).public.tikal-keys;
-      check = assert-path.override {
+      check = _name: assert-path.override {
         is-file = true; 
         error = { path-as-string, ... }: "The key at '${path-as-string}' for the nahual '${nahual}' could not be found. Did you run 'sync' and 'git add .'";
       };

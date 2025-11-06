@@ -18,7 +18,7 @@ let
     { is-file, is-directory, error }: path':
     let
       check =
-        (lib.isPath path' || lib.isDerivation path')
+        (lib.pathExists path' || lib.isDerivation path')
         && (lib.pathIsRegularFile path' || !is-file)
         && (lib.pathIsDirectory path' || !is-directory)
       ;
