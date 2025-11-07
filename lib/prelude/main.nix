@@ -1,4 +1,4 @@
-{ callPackage, lib, ... }:
+{ callPackage, test, lib, ... }:
 let
   inherit (lib.customisation) makeOverridable;
   strings = lib.strings;
@@ -19,7 +19,7 @@ let
 
         The input was ${store-path}
       '';
-      alphabet = lib.stringToCharacters "abcdefghijklmnopqrstuvwxyz1234567890-.";
+      alphabet = lib.stringToCharacters "abcdefghijklmnopqrstuvwxyz1234567890-._";
       # This function replaces the 'bad' characters that come from a string produced
       # from a store path and repalces them with 'good' characters that come from
       # the string defined above. Nix seems to be doing some sort of dodgey tagging of values
@@ -32,9 +32,6 @@ let
           lib.stringToCharacters (
             lib.replaceStrings ["${builtins.storeDir}/"] [""] store-path
       )))
-  ;
-  store-path-to-python-identifier = inp:
-    "_" + lib.replaceStrings [ builtins.storeDir "." "-" ] [ "" "__" "_" ] inp
   ;
   drop-store-prefix =
     makeOverridable
@@ -52,8 +49,16 @@ let
     in
       result
   ;
+  partition = tagger: values:
+    let
+      mapper = value: { ${tagger value} = value; };
+      joiner = item: items: [item] ++ items;
+    in
+      lib.foldAttrs joiner [] (map mapper values)
+  ;
 in
   {
-    inherit store-path-to-key store-path-to-python-identifier
-      drop-store-prefix is-prefix;
+    inherit store-path-to-key drop-store-prefix is-prefix
+      partition;
+    inherit (test) fold-attrs-recursive;
   }

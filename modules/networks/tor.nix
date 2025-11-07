@@ -3,108 +3,147 @@
 , lib
 , tikal
 , pkgs
-, nahual-pkgs
-, universe-context
+, tikal-secrets
 , ...
 }:
 let
+  inherit (tikal.prelude) do;
+  inherit (tikal-secrets) get-secret-public-path get-secret-private-path;
   inherit (tikal.xonsh) xsh;
-  inherit (tikal.sync) nahual-sync-script;
   inherit (lib) types mkIf mkOption;
   inherit (pkgs) gettext;
-  inherit (nahual-pkgs config.nahuales) tikal-secrets;
   log = tikal.prelude.log.add-context { file = ./tor.nix; };
   tor-sync = pkgs.tor.overrideAttrs (new: old: {
-    patches = old.patches ++ [ ./tor/0001-Command-line-option-to-pre-initialize-files.patch ];
+    patches =
+      old.patches
+      ++ [ ./tor/0001-Command-line-option-to-pre-initialize-files.patch ];
   });
 
-  tikal-onion-service = name: config:
-    let
-      torrc-init = pkgs.writeText "torrc" ''
-        HiddenServiceDir $private
-        HiddenServicePort 22 127.0.0.1:22
-      '';
-      onion-secrets = tikal-secrets.${name}.secret-folders {
-        tikal = {
-          # The secrets builder will encrypt the contents of $out
-          # before completing. Therefore they will not land on the
-          # nix store. However, they will be accessible while
-          # the builder is running and might remain in your
-          # system if '--keep-failed-runs' is used.
-          script = ''
-            mkdir -p $public
-            echo $USER
-            workdir=$(mktemp -d)
-            cat "${torrc-init}" | private="$private" ${gettext}/bin/envsubst > "$workdir/torrc"
-            cat "$workdir/torrc"
-            echo "${tor-sync}"
-            ${tor-sync}/bin/tor --init-files -d "$workdir" -f "$workdir/torrc"
+  # Name of the tikal-secret that is asociated with
+  # this module
+  tikal-tor-secret-name = "tikal-tor";
 
-            # Tor does not want exectue permissions on directory
-            # However, this will be compressed with tar, so
-            # execution permission will be needed
-            chmod +x $private
-            cp $private/hs_*_secret_key $private/hs_private_key
-            mv $private/hostname $public/
-            mv $private/hs_*_public_key $public/
-            rm -rf $private/authorized_clients
-            echo "canary" > "$private/canary"
-            cp $workdir/torrc $private/
-          '';
-        };
-      };
-    in
-      log.log-value { nahual = name; } "Tor hidden service" onion-secrets
-  ;
-
-  tikal-onion-services = lib.mapAttrs tikal-onion-service config.nahuales;
+  # Port to be used to create a socks proxy to
+  # access tor.
+  # Todo: make it configurable
   tor-socks-port = 39080;
 
-  to-tor-ssh = secrets:
-    let
-      tor-hosts =
-        lib.mapAttrs
-        (_: onion-service: lib.readFile "${onion-service.secrets.tikal.public}/hostname")
-        tikal-onion-services
-      ;
-    in
-      xsh.write-script-bin {
-        name = "tor-ssh";
-        vars = { inherit tor-hosts; };
-        script = { vars, ... }: ''
-          from docopt import docopt
-          import os
-          
-          progname = os.path.basename(__file__)
-          doc = f"""
-          Usage:
-            tor-ssh --input=<ssh-key> [-e] <nahual>
-
-          Options:
-            --input=<ssh-key> -i <ssh-key>      The ssh private key to use to connect
-            -e                                  Show the command rather than running it
-            <nahual>                            The nahual to connect via ssh.
-          """
-
-          args = docopt(doc)
-          nahual = args['<nahual>']
-          ssh_key = args['--input']
-          hosts = ${vars.tor-hosts}
-          host = hosts.get(nahual)
-
-          if host is None:
-            known_hosts = ", ".join(hosts.keys())
-            raise Exception(f"The specified nahual '{nahual}' is not known. Known nahuales in the universe are: '{known_hosts}'")
-
-          host = host.strip()
-          ${pkgs.openssh}/bin/ssh -o "ProxyCommand=${pkgs.netcat}/bin/nc -x 127.0.0.1:${builtins.toString tor-socks-port} -X 5 %h %p" -i f"{ssh_key}" f"nixos@{host}"
-          
-        '';
-      }
+  tikal-onion-service-torrc =
+    pkgs.writeText "torrc" ''
+      HiddenServiceDir $private
+      HiddenServicePort 22 127.0.0.1:22
+      ''
   ;
 
+  # Script that generates a hidden service. This is used
+  # to create a hidden serivce for each nahual which
+  # can then be used by other nahuales to communicate
+  # with each other.
+  tikal-onion-service-secrets-script =
+    ''
+    mkdir -p $public
+    echo $USER
+    workdir=$(mktemp -d)
+    cat "${tikal-onion-service-torrc}" \
+      | private="$private" ${gettext}/bin/envsubst \
+      > "$workdir/torrc"
+    cat "$workdir/torrc"
+    echo "${tor-sync}"
+    ${tor-sync}/bin/tor --init-files -d "$workdir" -f "$workdir/torrc"
 
-  tor-network-module = name: config:
+    # Tor does not want exectue permissions on directory
+    # However, this will be compressed with tar, so
+    # execution permission will be needed
+    chmod +x $private
+    cp $private/hs_*_secret_key $private/hs_private_key
+    mv $private/hostname $public/
+    mv $private/hs_*_public_key $public/
+    rm -rf $private/authorized_clients
+    echo "canary" > "$private/canary"
+    cp $workdir/torrc $private/
+    ''
+  ;
+
+  tikal-tor-ssh =
+    xsh.write-script-bin {
+      name = "tor-ssh";
+      vars = { inherit tikal-tor-hosts; };
+      script = { vars, ... }: ''
+        from docopt import docopt
+        import os
+        
+        progname = os.path.basename(__file__)
+        doc = f"""
+        Usage:
+          tor-ssh --input=<ssh-key> [--print] <nahual>
+
+        Options:
+          --input=<ssh-key> -i <ssh-key>      The ssh private key to use to connect
+          --print -p                          Show the command rather than running it
+          <nahual>                            The nahual to connect via ssh.
+        """
+
+        args = docopt(doc)
+        nahual = args['<nahual>']
+        ssh_key = args['--input']
+        hosts = ${vars.tikal-tor-hosts}
+        host = hosts.get(nahual)
+        only_print = args['--print']
+
+        if host is None:
+          known_hosts = ", ".join(hosts.keys())
+          raise Exception(f"The specified nahual '{nahual}' is not known. Known nahuales in the universe are: '{known_hosts}'")
+
+        host = host.strip()
+        cmd = [
+          "${pkgs.openssh}/bin/ssh",
+          "-o",
+          'ProxyCommand="${pkgs.netcat}/bin/nc -x 127.0.0.1:${builtins.toString tor-socks-port} -X 5 %h %p"',
+          "-i",
+          f"{ssh_key}",
+          f"nixos@{host}"
+        ]
+
+        if only_print:
+          print(" ".join(cmd))
+        else:
+          @(args)
+      '';
+    }
+  ;
+
+  tikal-tor-host = nahual: _config:
+    let
+      public = get-secret-public-path {
+        inherit nahual;
+        name = tikal-tor-secret-name;
+      };
+    in
+      lib.readFile "${public}/hostname"
+  ;
+
+  # Attribute set coontaining the address of the
+  # hidden service that points to each of
+  # the nahuales in the universe
+  tikal-tor-hosts = lib.mapAttrs tikal-tor-host config.nahuales;
+
+  tikal-tor-set-hostname = nahual:
+    let
+      host = tikal-tor-hosts.${nahual};
+    in
+      ''
+      export TOR_${nahual}="${host}"
+      ''
+  ;
+
+  tikal-tor-set-hostnames = do [
+    lib.attrNames config.nahuales
+    "$>" map tikal-tor-set-hostname
+    "|>" lib.concatStringsSep "\n"
+    "|>" pkgs.writeScriptBin "tikal-tor-set-hostnames"
+  ];
+
+  tor-network-module = nahual: _config:
     # This produces a nixos module which should
     # do the following:
     # 1. Enables tor
@@ -113,25 +152,16 @@ let
     # 4. Creates scripts to easily ssh into
     #    other servers via tor
     let
-      onion-services = tikal-onion-services.${name};
-      secrets = onion-services.secrets;
-      set-hostname = name': onion-service: 
-        ''
-          export TOR_${name'}=$(cat ${onion-service.secrets.tikal.public}/hostname)
-        ''
-      ;
-      tor-ssh = to-tor-ssh config;
-      set-hostnames = lib.mapAttrsFlatten set-hostname tikal-onion-services;
-      tikal-tor-package = pkgs.writeScriptBin "tikal-tor" ''
-        ${lib.concatStringsSep "\n" set-hostnames}
-      '';
+      onion-service-private-directory = get-secret-private-path {
+        name = tikal-tor-secret-name;
+      };
+      secretKey = "${onion-service-private-directory}/hs_private_key";
     in
     {
-      imports = [ onion-services.module ];
       config = {
         environment.systemPackages = [
-          tikal-tor-package
-          (log.log-debug { nahual = name; } "tor-ssh: ${tor-ssh}" tor-ssh)
+          tikal-tor-set-hostnames
+          tikal-tor-ssh
         ];
         services.tor = {
           enable = true;
@@ -145,8 +175,8 @@ let
           };
           
           relay.onionServices = {
-            "tikal" = {
-              secretKey = "${secrets.tikal.private}/hs_private_key";
+            "${tikal-tor-secret-name}-ssh" = {
+              inherit secretKey;
               map = [ { port = 22; target = { port = 22; }; } ];
             };
           };
@@ -155,27 +185,11 @@ let
     }
   ;
 
-  tor-modules = name: config: lib.map (mod: mod name config) [ tor-network-module ];
-
-  sync-script = nahual-sync-script {
-    name = "tikal-host-onion-service";
-    description = ''
-    This script does the following:
-      1. Create the public keys for the onion services
-         of each of the nahuales. This is achieved using
-         a patched tor server which initializes onion
-         services w/o opening any network connections.
-      2. Encrypt and copy these secrets to the public
-         directory of each Nahual. This way, the nahuales
-         can be built and the private keys will be available
-         in each of the images.
-    '';
-    each-nahual = {
-      build-step = ''
-        ${tor-sync}/bin/tor --init-files -d f"{out}"
-      '';
-    };
-  };
+  tor-modules = name: config:
+    lib.map
+    (mod: mod name config)
+    [ tor-network-module ]
+  ;
   tor-cfg = config.networks.tor;
 in
 {
@@ -192,11 +206,14 @@ in
   config = mkIf tor-cfg.enable {
     
     tikal = {
-      sync.scripts = [
-        sync-script
-      ];
-
       build.modules = lib.mapAttrs tor-modules config.nahuales;
     };
+
+    secrets.all-nahuales = {
+      ${tikal-tor-secret-name} = {
+        text = tikal-onion-service-secrets-script;
+      };
+    };
+
   };
 }

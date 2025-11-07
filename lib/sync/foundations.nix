@@ -4,7 +4,7 @@ let
   gitignore = writeTextFile {
     name = ".gitignore";
     text = ''
-      private
+      /private/
     '';
   };
 in

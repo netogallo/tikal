@@ -8,6 +8,7 @@ let
   tikal-config =
     {
       log-level = 1;
+      test-filters = null;
     } //
     config
   ;
@@ -19,6 +20,8 @@ let
         prelude = self.callPackage ./lib/prelude.nix {};
         xonsh = self.callPackage ./lib/xonsh.nix {};
         sync = self.callPackage ./lib/sync/lib.nix {};
+        store = self.callPackage ./lib/store.nix {};
+        syslog = self.callPackage ./lib/syslog.nix {};
       };
     }
   );
@@ -26,6 +29,10 @@ let
   log = scope.tikal.prelude.log.add-context { file = ./tikal.nix; };
 
   universe =
+    # The universe definition. This can be annything which
+    # can be treated as a nixos module, including (1) path
+    # to a nix file (2) attribute set (3) function, among
+    # other values.
     spec:
     {
       # The root path of the flake. Should always be ./
@@ -67,12 +74,13 @@ let
           sync = (sync-scope.callPackage ./lib/sync.nix { }).app;
           xonsh = xonsh.xonsh-app;
         };
-        nixosModules = scope.tikal.prelude.trace nixos.nixos-modules nixos.nixos-modules;
+        nixosModules = log.log-value "Nixos Modules" nixos.nixos-modules;
       }
   ;
 in
 log.log-info "done" {
   lib = {
     inherit universe;
+    inherit (scope) tikal;
   };
 }

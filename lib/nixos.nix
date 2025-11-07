@@ -48,5 +48,5 @@ let
   ;
 in
   {
-    nixos-modules = lib.mapAttrs to-nixos-module universe.flake.config.nahuales;
+    nixos-modules = lib.mapAttrs to-nixos-module flake-attrs.config.nahuales;
   }

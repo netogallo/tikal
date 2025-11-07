@@ -38,7 +38,7 @@ let
         (
           if include-value && value' != ""
           then { value = value'; }
-          else { value = ""; }
+          else { }
         ) //
         (
           if context' != ""
