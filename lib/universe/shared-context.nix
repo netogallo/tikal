@@ -1,6 +1,6 @@
 { lib }:
 let
-  get-tikal-dirs = { tikal-dir }: {
+  get-tikal-dirs = { tikal-dir, ... }: {
     inherit tikal-dir;
     private-dir = "${tikal-dir}/private";
     public-dir = "${tikal-dir}/public";
@@ -18,14 +18,14 @@ let
       inherit (get-tikal-dirs ctx) private-dir public-dir;
     in
       rec {
-        private-root = "${private-dir}/${name}";
-        public-root = "${public-dir}/${name}";
+        private-root = "${private-dir}/nahuales/${name}";
+        public-root = "${public-dir}/nahuales/${name}";
         keys-root = "${private-root}/keys";
         public-keys-root = "${public-root}/keys";
       }
   ;
   to-nahual =
-    ctx: name: value:
+    ctx: name: _value:
     let
       inherit (get-nahual-dirs ctx name)
         private-root

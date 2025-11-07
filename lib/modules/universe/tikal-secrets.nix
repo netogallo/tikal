@@ -2,7 +2,6 @@
 let
   inherit (tikal) prelude;
   tikal-key = nahual-config.flake.public.tikal-keys.tikal_main_pub;
-  tikal-private-key = nahual-config.flake.public.tikal-keys.tikal_main_pub;
   tikal-paths = tikal-foundations.paths;
   log = tikal-log.log;
   post-decrypt-script-name = "post_decrypt";
@@ -74,27 +73,26 @@ let
       inherit (lib) types mkOption;
       inherit (pkgs) age gnutar;
       secret-files = config.tikal.secrets.files;
-      mk-decrypt-folder-script = store-path:
-        let
-          dest = to-secret-store-path store-path;
-        in
-          ''
-          rm -rf "${dest}"
-          mkdir -p "${dest}"
-          ${log} --tag=secrets -d "Decrypging '${dest}' from '${store-path}/private' using '${tikal-paths.tikal-main}'"
-          ${age}/bin/age -d -i "${tikal-paths.tikal-main}" "${store-path}/private" | ${gnutar}/bin/tar -xC "${dest}"
+      is-enabled = lib.length secret-files > 0;
+      mk-decrypt-folder-script = dest: store-path:
+        ''
+        rm -rf "${dest}"
+        mkdir -p "${dest}"
+        ${log} --tag=secrets -d "Decrypging '${dest}' from '${store-path}/private' using '${tikal-paths.tikal-main}'"
+        ${age}/bin/age -d -i "${tikal-paths.tikal-main}" "${store-path}/private" | ${gnutar}/bin/tar -xC "${dest}"
 
-          if [ "$?" != 0 ]; then
-            DIR=$(dirname "${tikal-paths.tikal-main}")
-            ${log} --tag=secrets -e "Decryption failed for '${dest}' using key '${tikal-paths.tikal-main}'"
-          else
-            (cd "${dest}"; private="${dest}" ${store-path}/${post-decrypt-script-name})
-          fi
-          ''
+        if [ "$?" != 0 ]; then
+          DIR=$(dirname "${tikal-paths.tikal-main}")
+          ${log} --tag=secrets -e "Decryption failed for '${dest}' using key '${tikal-paths.tikal-main}'"
+        else
+          (cd "${dest}"; private="${dest}" ${store-path}/${post-decrypt-script-name})
+        fi
+        ''
       ;
       decrypt-scripts = prelude.do [
         secret-files
-        "$>" lib.map mk-decrypt-folder-script
+        "$>" lib.mapAttrs mk-decrypt-folder-script
+        "|>" lib.attrValues
         "|>" lib.concatStringsSep "\n"
       ];
       mk-post-decryption-script = script:
@@ -108,16 +106,27 @@ let
         "$>" lib.map mk-post-decryption-script
         "|>" lib.concatStringsSep "\n"
       ];
+      tikal-secret-definition = {
+        options = {
+          encrypted-path = mkOption {
+            type = types.str;
+            description = ''
+              The path where the ecnrypted secret resides. This is a path in the
+              Nix store where the output of the encryption derivation got saved.
+            '';
+          };
+        };
+      };
     in
       {
         options = {
           tikal.secrets.files = mkOption {
-            type = types.listOf types.string;
+            type = types.attrsOf (types.submodule tikal-secret-definition);
             description = ''
             List of encrypted files in the nix store that will be decrypted
             using the tikal master key on boot.
             '';
-            default = [];
+            default = {};
           };
 
           tikal.secrets.post-decryption-scripts = mkOption {
@@ -132,7 +141,8 @@ let
           };
         };
 
-        config = {
+        config = mkIf is-enabled {
+
           # Create a ramfs mount point where the decrypted files
           # are to be stored.
           # Obtained from agenix: https://github.com/ryantm/agenix/blob/531beac616433bac6f9e2a19feb8e99a22a66baf/modules/age.nix#L28 
