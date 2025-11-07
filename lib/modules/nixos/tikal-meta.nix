@@ -48,7 +48,7 @@ let
           message = "The value cannot be changed. It is metadata.";
         }
         {
-          assertion = config.tikal.meta.nahual-private = nahual-private;
+          assertion = config.tikal.meta.nahual-private == nahual-private;
           message = "The value cannot be changed. It is metadata.";
         }
       ];

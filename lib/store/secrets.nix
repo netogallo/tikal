@@ -108,6 +108,7 @@ let
         # Log error if decryption failed
         ${log} --tag=secrets \
           -e "Decryption failed for '${dest}' using key '${tikal-private-key}'"
+        read -sr -p "Press enter to continue: " X
       else
         (cd "${dest}"; ${post-decrypt})
       fi

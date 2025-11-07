@@ -54,7 +54,7 @@ let
   ;
 
   get-secret-private-path = { name }@key:
-    "${tikal-secrets-store-directory}/name"
+    "${tikal-secrets-store-directory}/${name}"
   ;
 
   to-decrypt-script = { name, nahual, ... }:
@@ -68,11 +68,8 @@ let
   secrets-activation-script = secrets:
     let
       decrypt-secret = { key, ... }: to-decrypt-script key;
-      decrypt-secrets = do [
-        secrets
-        "$>" map decrypt-secret
-        "|>" lib.concatStringSep "\n"
-      ];
+      decrypt-secrets =
+        lib.concatStringsSep "\n" (map decrypt-secret secrets);
       post-decryption-scripts = "";
     in
       ''
@@ -107,7 +104,9 @@ let
 in
   with-tests
   {
-    inherit to-nahual-secret get-secret-private-path get-secret-store-path;
+    inherit to-nahual-secret get-secret-private-path
+    get-secret-store-path secrets-activation-script
+    get-secret-public-path;
   }
   {
     tikal.modules.tikal-secrets = {};

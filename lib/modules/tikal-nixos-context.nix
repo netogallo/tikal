@@ -2,7 +2,7 @@
 # This usually means hardcoded paths which hold important values related
 # to Tikal.
 {
-  tikal-foundationos
+  tikal-foundations
 }:
 {
   tikal-secrets = with tikal-foundations.paths; rec {

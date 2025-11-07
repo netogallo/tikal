@@ -66,20 +66,22 @@ let
   ];
   secrets-locks = lib.concatLists (lib.attrValues locks-all-nahuales);
 
-  to-nahual-secrets-module = nahual: secrets:
+  to-nahual-secrets-modules = nahual: secrets:
     let
       is-enabled = lib.length secrets > 0;
     in
-      {
-        config = mkIf is-enabled {
-          system.activationScripts.tikal-secrets-activate.text =
-            secrets-activation-script { inherit nahual secrets; }
-          ;
-        };
-      }
+      [
+        {
+          config = mkIf is-enabled {
+            system.activationScripts.tikal-secrets-activate.text =
+              secrets-activation-script secrets
+            ;
+          };
+        }
+      ]
   ;
   modules-all-nahuales =
-    lib.mapAttrs to-nahual-secrets-module locks-all-nahuales;
+    lib.mapAttrs to-nahual-secrets-modules locks-all-nahuales;
   secrets-modules = modules-all-nahuales;
 in
   {
