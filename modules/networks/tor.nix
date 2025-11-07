@@ -98,10 +98,10 @@ let
         cmd = [
           "${pkgs.openssh}/bin/ssh",
           "-o",
-          "ProxyCommand=${pkgs.netcat}/bin/nc -x 127.0.0.1:${builtins.toString tor-socks-port} -X 5 %h %p",
+          'ProxyCommand="${pkgs.netcat}/bin/nc -x 127.0.0.1:${builtins.toString tor-socks-port} -X 5 %h %p"',
           "-i",
           f"{ssh_key}",
-          f"{nixos@{host}"
+          f"nixos@{host}"
         ]
 
         if only_print:
