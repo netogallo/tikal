@@ -2,11 +2,12 @@
   description = "A very basic flake";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     utils.url = "github:numtide/flake-utils";    
+    nixos-rockchip.url = "github:netogallo/nixos-rockchip/feature/ornagepi5b-updates";
   };
 
-  outputs = { self, nixpkgs, utils }:
+  outputs = { self, nixpkgs, utils, nixos-rockchip }:
   let
     inherit (utils.lib) eachDefaultSystem;
     flake = config:
@@ -14,7 +15,10 @@
         system:
         let
           pkgs = import nixpkgs { inherit system; };
-          tikal = pkgs.callPackage ./tikal.nix { inherit nixpkgs system config; };
+          tikal =
+            pkgs.callPackage
+            ./tikal.nix
+            { inherit nixpkgs system config nixos-rockchip; };
         in
           {
             packages.default = pkgs.writeScript "tikal" "echo hello tikal!";

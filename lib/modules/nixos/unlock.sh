@@ -38,8 +38,8 @@ decrypt_tikal_master_key() {
   RESULT="$?"
 
   if [ "$RESULT" == "0" ]; then
-    mkdir -p /run/keys/tikal
-    mv "$TMP_KEY" /run/keys/tikal/id_tikal
+    mkdir -p "${tikal-decrypt-keys-directory}"
+    mv "$TMP_KEY" "${tikal-decrypt-master-key-file}"
     echo "Success! Decrypted key to /run/keys/tikal/id_tikal"
     return 0
   else
