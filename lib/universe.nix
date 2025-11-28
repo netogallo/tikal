@@ -10,13 +10,13 @@ let
     })
   ;
   inherit (universe-eval-scope) universe-eval-context flake-context;
-  module = lib.evalModules {
+  module = log.log-value "universe-module.module" (lib.evalModules {
     modules = [
       ../modules/tikal-main.nix
       universe
     ];
     args = universe-eval-context;
-  };
+  });
 
   sync-scope =
     lib.makeScope pkgs.newScope (self: {
@@ -27,7 +27,7 @@ let
     })
   ;
   
-  universe-module = {
+  universe-module = log.log-value "universe-module" {
     inherit module;
     # inherit (sync-scope.sync-context) sync-scripts;
   };

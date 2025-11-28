@@ -46,7 +46,7 @@ let
       {
         config = {
           services.openssh.enable = true;
-          users.users.nixos.openssh.authorizedKeys.keyFiles = public-ssh-keys;
+          users.users.tikal.openssh.authorizedKeys.keyFiles = public-ssh-keys;
         };
       }
   ;
@@ -68,8 +68,8 @@ in
       secrets.all-nahuales = {
         ${tikal-ssh-secret-name} = {
           text = gen-key-script;
-          user = "nixos";
-          group = "nixos";
+          user = "tikal";
+          group = "tikal";
         };
       };
       tikal.build.modules = lib.mapAttrs to-ssh-modules config.nahuales;

@@ -5,15 +5,17 @@
 # directly define/set options defined in this model. Rather, other modules will define
 # high level options for users to use. These modules will translate the high level
 # options into the options defined in this module.
-{ config, lib, ... }:
+{ config, lib, tikal, ... }:
 let
   inherit (lib) types mkOption;
+  log = tikal.prelude.log.add-context { file = ./tikal-main.nix; };
   imports = [
     ./config/tikal-store-lock.nix
     ./config/tikal-secrets.nix
     ./universe/members.nix
     ./networks/tor.nix
     ./remote-access/ssh.nix
+    ./tikal-platforms.nix
   ];
   script-type = types.submodule {
     options = {
@@ -88,5 +90,7 @@ in
     };
 
   };
-  config = {};
+  config = {
+    tikal.build.modules = lib.mapAttrs (_name: _value: []) config.nahuales;
+  };
 }

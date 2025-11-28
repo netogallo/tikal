@@ -27,10 +27,17 @@ let
       lib.concatStringsSep " " (lib.mapAttrsFlatten mapper ctx)
   ;
   
-  trace-log = { level, message, context, include-value }: value:
+  trace-log =
+    {
+      level,
+      message,
+      context,
+      include-value,
+      max-depth,
+    }: value:
     let
       context' = write-context context;
-      value' = debug-print value;
+      value' = debug-print.override { inherit max-depth; } value;
       log =
         {
           inherit level message;
@@ -53,35 +60,42 @@ let
   ;
   new-logger = { log-level, context, ... }@logger-args: rec {
     
-    log-internal = { level, message, include-value, extra-context ? {} }: 
+    log-internal =
+      {
+        level,
+        message,
+        include-value,
+        extra-context ? {},
+        max-depth
+      }: 
       if level > log-level
       then lib.id
       else
         trace-log
         {
-          inherit level message include-value;
+          inherit level message include-value max-depth;
           context = context // extra-context // { inherit log-level; };
         }
     ;
 
     log-message =
       lib.makeOverridable
-      ({ include-value, level }: msg-or-ctx:
+      ({ include-value, level, max-depth }: msg-or-ctx:
         if lib.typeOf msg-or-ctx == "string"
         then value:
           log-internal {
-            inherit level include-value;
+            inherit level include-value max-depth;
             message = msg-or-ctx;
           }
           value
         else message: value:
           log-internal {
-            inherit level include-value message;
+            inherit level include-value message max-depth;
             extra-context = msg-or-ctx;
           }
           value
       )
-      { include-value = false; level = level.debug; }
+      { include-value = false; level = level.debug; max-depth = 1; }
     ;
 
     log-info = log-message.override { level = level.info; };

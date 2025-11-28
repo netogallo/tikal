@@ -15,6 +15,7 @@ let
   lib' = lib;
   log = tikal.prelude.log.add-context { file = ./tikal-core.nix; inherit nahual; };
   inherit (tikal.prelude.template) template;
+  inherit (tikal) hardcoded;
   module = { lib, pkgs, ... }:
     let
       core-scope = lib'.makeScope pkgs'.newScope (self: {
@@ -40,6 +41,7 @@ let
             inherit tikal-main-enc tikal-paths;
             age = "${pkgs.age}/bin/age";
             expect = "${pkgs.expect}/bin/expect";
+            inherit (hardcoded) tikal-decrypt-keys-directory tikal-decrypt-master-key-file;
           }
         )
       ;

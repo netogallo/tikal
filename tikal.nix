@@ -2,8 +2,9 @@
   nixpkgs,
   system,
   lib,
+  nixos-rockchip,
   config ? {}
-}:
+}@inputs:
 let
   tikal-config =
     {
@@ -12,19 +13,26 @@ let
     } //
     config
   ;
-  scope = lib.makeScope pkgs.newScope (self:
-    {
+  scope-builder = { system }:
+    let
       pkgs = import nixpkgs { inherit system; };
-      inherit nixpkgs tikal-config;
-      tikal = {
-        prelude = self.callPackage ./lib/prelude.nix {};
-        xonsh = self.callPackage ./lib/xonsh.nix {};
-        sync = self.callPackage ./lib/sync/lib.nix {};
-        store = self.callPackage ./lib/store.nix {};
-        syslog = self.callPackage ./lib/syslog.nix {};
-      };
-    }
-  );
+      lib' = pkgs.lib;
+    in
+      lib'.makeScope pkgs.newScope (self:
+        {
+          inherit nixpkgs pkgs tikal-config;
+          tikal = {
+            prelude = self.callPackage ./lib/prelude.nix {};
+            xonsh = self.callPackage ./lib/xonsh.nix {};
+            sync = self.callPackage ./lib/sync/lib.nix {};
+            store = self.callPackage ./lib/store.nix {};
+            syslog = self.callPackage ./lib/syslog.nix {};
+            platforms = self.callPackage ./lib/platforms.nix { inherit nixos-rockchip; };
+            hardcoded = self.callPackage ./lib/hardcoded.nix {};
+          };
+        })
+  ;
+  scope = lib.makeOverridable scope-builder { inherit system; };
   inherit (scope) callPackage pkgs xonsh;
   log = scope.tikal.prelude.log.add-context { file = ./tikal.nix; };
 
@@ -40,7 +48,8 @@ let
       # what is the root directory of the systems being configured
       # in order to generate the secrets in the right place.
       flake-root,
-      base-dir ? null
+      base-dir ? null,
+      universe-repository ? null
     }:
     let
       # The "universe.nix" module is responsible for evaluating the
@@ -68,12 +77,24 @@ let
           universe-module = instance.universe-module;
         }
       );
+      installers =
+        callPackage
+        ./lib/installer.nix
+        {
+          inherit universe-repository;
+          universe = instance;
+          tikal-scope = scope;
+        }
+      ;
     in
       {
-        apps = {
-          sync = (sync-scope.callPackage ./lib/sync.nix { }).app;
-          xonsh = xonsh.xonsh-app;
-        };
+        apps =
+          {
+            sync = (sync-scope.callPackage ./lib/sync.nix { }).app;
+            xonsh = xonsh.xonsh-app;
+            inherit (installers) installers;
+          }
+        ;
         nixosModules = log.log-value "Nixos Modules" nixos.nixos-modules;
       }
   ;
