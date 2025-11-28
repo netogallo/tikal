@@ -11,6 +11,10 @@ let
     tikal-main-enc = "${keys}/id_tikal.enc";
     store-secrets = "${root}/store-secrets";
   };
+  system = {
+    tikal-user = "tikal";
+    tikal-group = "tikal";
+  };
   as-relative = _: path:
     if strings.substring 0 5 path == "/etc/"
     then strings.substring 5 (-1) path
