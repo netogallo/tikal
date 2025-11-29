@@ -16,6 +16,7 @@ let
     ./networks/tor.nix
     ./remote-access/ssh.nix
     ./tikal-platforms.nix
+    ./tikal-nixos-base.nix
   ];
   script-type = types.submodule {
     options = {

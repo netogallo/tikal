@@ -18,7 +18,10 @@
           tikal =
             pkgs.callPackage
             ./tikal.nix
-            { inherit nixpkgs system config nixos-rockchip; };
+            {
+              inherit nixpkgs system config nixos-rockchip;
+              tikal-flake = self;
+            };
         in
           {
             packages.default = pkgs.writeScript "tikal" "echo hello tikal!";

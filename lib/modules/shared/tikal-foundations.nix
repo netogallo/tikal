@@ -26,4 +26,5 @@ in
   # Paths is an attribute set containing the final location
   # in the nixos system of important tikal files.
   paths = paths // { relative = relative-paths; };
+  inherit system;
 }

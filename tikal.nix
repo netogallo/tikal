@@ -3,6 +3,7 @@
   system,
   lib,
   nixos-rockchip,
+  tikal-flake,
   config ? {}
 }@inputs:
 let
@@ -86,6 +87,15 @@ let
           tikal-scope = scope;
         }
       ;
+      vms =
+        callPackage
+        ./lib/vms.nix
+        {
+          universe = instance;
+          inherit (nixos) nixos-modules;
+          inherit tikal-flake;
+        }
+      ;
     in
       {
         apps =
@@ -93,6 +103,7 @@ let
             sync = (sync-scope.callPackage ./lib/sync.nix { }).app;
             xonsh = xonsh.xonsh-app;
             inherit (installers) installers;
+            inherit (vms) vms;
           }
         ;
         nixosModules = log.log-value "Nixos Modules" nixos.nixos-modules;
