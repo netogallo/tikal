@@ -4,9 +4,11 @@
 , tikal
 , pkgs
 , tikal-secrets
+, tikal-foundations
 , ...
 }:
 let
+  inherit (tikal-foundations.system) tikal-user;
   inherit (tikal.prelude) do;
   inherit (tikal-secrets) get-secret-public-path get-secret-private-path;
   inherit (tikal.xonsh) xsh;
@@ -95,19 +97,20 @@ let
           raise Exception(f"The specified nahual '{nahual}' is not known. Known nahuales in the universe are: '{known_hosts}'")
 
         host = host.strip()
-        cmd = [
+        cmd_parts = [
           "${pkgs.openssh}/bin/ssh",
           "-o",
           'ProxyCommand="${pkgs.netcat}/bin/nc -x 127.0.0.1:${builtins.toString tor-socks-port} -X 5 %h %p"',
           "-i",
           f"{ssh_key}",
-          f"nixos@{host}"
+          f"${tikal-user}@{host}"
         ]
+        cmd = " ".join(cmd_parts)
 
         if only_print:
-          print(" ".join(cmd))
+          print(f"{cmd}")
         else:
-          @(args)
+          ${pkgs.bash}/bin/bash -c f"{cmd}"
       '';
     }
   ;
