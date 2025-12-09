@@ -201,7 +201,7 @@ in
       enable = mkOption {
         default = false;
         type = types.bool;
-        description = "Enable the use of tor for devices to communicate with each other.";
+        description = "Enable the use of tor for nahuales to communicate with each other.";
       };
     };
   };
