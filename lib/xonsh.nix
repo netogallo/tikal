@@ -112,7 +112,7 @@ let
             ${var-unique-name} = "${value}"
           '';
           var-decl =
-            if lib.isString value || lib.isDerivation value
+            if lib.isString value || lib.isDerivation value || lib.isPath value
             then var-str
             else if lib.isAttrs value
             then var-object
@@ -226,6 +226,9 @@ let
 
   write-script-bin = makeXshScript (
     write: args@{ name, ... }: pkgs.writeScriptBin name (write args)
+  );
+  write-shell-script = makeXshScript (
+    write: args@{ name, ... }: pkgs.writeScript name (write args)
   );
   test-xsh = { name, pythonpath ? [], script, to-nix-tests ? null }:
     let
@@ -347,6 +350,12 @@ let
           output = tests-output;
         }
   ;
+  run-command = { name, ... }@args:
+  let
+    script = write-script-bin args;
+  in
+    pkgs.runCommand name {} "${script}/bin/${name}"
+  ;
 in
   {
     inherit xonsh;
@@ -355,7 +364,7 @@ in
       program = "${xonsh}/bin/xonsh";
     };
     xsh = {
-      inherit write-script-bin write-packages to-xsh-vars;
+      inherit write-script-bin write-shell-script write-packages to-xsh-vars run-command;
       write-script = xsh-write-script;
       test = test-xsh;
     };

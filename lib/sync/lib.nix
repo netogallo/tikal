@@ -1,10 +1,12 @@
-{ tikal, pkgs, lib, callPackage, ... }:
+{ tikal, universe, pkgs, lib, callPackage, ... }:
 let
+  universe-module = universe;
   inherit (tikal.prelude) do store-path-to-key;
   inherit (tikal.prelude.python) is-valid-python-identifier store-path-to-python-identifier;
   inherit (tikal.xonsh) xsh;
   inherit (tikal.prelude) test;
   inherit (tikal.prelude.attrs) merge-disjoint map-attrs-with;
+  inherit (tikal.test-utils) mocks;
   nahual-sync-script =
     {
       name
@@ -106,11 +108,16 @@ let
       };
       uid-each = store-path-to-key "${each-nahual-script}";
       uid-main = store-path-to-key "${main-script}";
+
+      # Todo: the universe is avaliable in the module context
+      # when building a sync script. It should be possible
+      # to simply inject that universe rather than have
+      # it pass as an argument here.
       packages = { universe, ... }:
         let
           main = xsh.write-script {
             name = "main.xsh";
-            vars = { inherit universe; };
+            vars = { universe = universe.config.tikal.context.sync; };
             script = { vars, ... }: ''
 
               def __main__(tikal):
@@ -170,15 +177,20 @@ let
     , to-nix-tests ? null
     }:
     let
-      universe-instance =
-        callPackage
-        ../universe.nix
-        {
-          inherit universe;
+      test-tikal-config = {
+        inherit universe;
+        tikal-config = {
           flake-root = ./.;
           base-dir = null;
-        }
-      ; 
+        };
+      };
+      universe-instance = (mocks.universe {
+        inherit universe;
+        tikal-config = {
+          flake-root = ./.;
+          base-dir = null;
+        };
+      });
       override-user-script = script-fn:
         let
           script-fn-override = args:
@@ -209,7 +221,7 @@ let
       test-context = "${test-vars-prefix}_test_context";
       test-env-vars = { inherit test-case test-tikal test-context; };
       script-builder = nahual-sync-script sync-script-test;
-      script = script-builder.packages { universe = universe-instance.config; };
+      script = script-builder.packages { universe = universe-instance; };
       name = script-builder.name;
       xsh-vars = xsh.to-xsh-vars vars;
       tests-text = tests { vars = xsh-vars.bindings; };

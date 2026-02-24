@@ -1,4 +1,4 @@
-{ pkgs, flake-context, tikal, lib, universe, ... }:
+{ flake-context, sync-context, tikal, lib, newScope, ... }:
 let
   log = tikal.prelude.log.add-context { file = ./main.nix; };
   nahual-pkgs = self: nahuales:
@@ -24,8 +24,14 @@ let
         tikal-secrets = ./tikal-secrets.nix;
       }
   ;
-  scope = lib.makeScope pkgs.newScope (self: {
-    inherit pkgs lib tikal universe flake-context;
+
+  /**
+  This is the scope that gets passed as the arguments to the modules
+  which define the universe. This module mainly contains libraries
+  which are specific to the universe evaluation stage.
+  */
+  scope = lib.makeScope newScope (self: {
+    inherit tikal;
     tikal-foundations = self.callPackage ../shared/tikal-foundations.nix {};
     tikal-log = self.callPackage ../shared/tikal-log.nix {};
     # nahual-pkgs = nahual-pkgs self;
@@ -33,6 +39,7 @@ let
     tikal-secrets = self.callPackage ../tikal-secrets.nix {};
     tikal-nixos-context = self.callPackage ../tikal-nixos-context.nix {};
     tikal-flake-context = self.callPackage ../tikal-flake-context.nix {};
+    tikal-sync-context = sync-context.config;
   });
 in
   scope

@@ -1,12 +1,11 @@
-{ callPackage, pkgs, lib, tikal-config, ... }:
+{ callPackage, lib, newScope, tikal-config, ... }:
 let
-  scope = lib.makeScope pkgs.newScope (self:
+  scope = lib.makeScope newScope (self:
     {
       do = self.callPackage ./prelude/do.nix {};
       trace = self.callPackage ./prelude/trace.nix {};
       main = self.callPackage ./prelude/main.nix {};
       log = self.callPackage ./prelude/log.nix { inherit (tikal-config) log-level; };
-      template = self.callPackage ./prelude/template.nix {};
       python = self.callPackage ./prelude/python.nix {};
       string = self.callPackage ./prelude/string.nix {};
       godel = self.callPackage ./prelude/godel.nix {};

@@ -44,7 +44,14 @@ let
     let
       mk-secret = pkgs.writeScript name text;
       link-post-decrypt-scripts = script:
-        ''ln -s ${script} "$out/${post-decrypt-scripts-directory}/"''
+        # Todo: ideally, we should use symlinks, but
+        # this is tricky as the system running sync
+        # might not be the one running the post-decrypt
+        # stages. Therefore, we must copy.
+        ''
+        cp ${script} "$out/${post-decrypt-scripts-directory}/"
+        chmod +x "$out/${post-decrypt-scripts-directory}/"
+        ''
       ;
       post-decrypt-text = do [
         post-decrypt
@@ -78,7 +85,8 @@ let
         ${log} --tag=secrets \
           -d "Running post-decrtyp scripts at $DIR"
 
-        for script in "$DIR"/*; do
+        for script_ref in "$DIR"/*; do
+          script=$(readlink -f "$script_ref")
         	if [[ -f "$script" && -x "$script" ]]; then
         		private="${dest}" "$script"
         	else

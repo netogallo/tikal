@@ -4,7 +4,7 @@
 # These get placed into a configuration directory which becomes part of the
 # flake. This module is used to refer to items in the config directory of
 # the flake.
-{ lib, tikal, flake-context, ... }:
+{ lib, tikal, universe, flake-context, ... }:
 let
   inherit (tikal.prelude.path) assert-path;
   _legacy-nahual-flake-config = nahual:
@@ -30,4 +30,6 @@ in
   tikal-secrets = {
     inherit tikal-public-key;
   };
+  inherit (flake-context) flake-root public-dir;
+  nahuales = (flake-context.config universe.config.nahuales).nahuales;
 }

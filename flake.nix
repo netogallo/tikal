@@ -2,35 +2,42 @@
   description = "A very basic flake";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
-    utils.url = "github:numtide/flake-utils";    
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixos-rockchip.url = "github:netogallo/nixos-rockchip/feature/ornagepi5b-updates";
+    flake-parts.url = "github:hercules-ci/flake-parts";
   };
 
-  outputs = { self, nixpkgs, utils, nixos-rockchip }:
-  let
-    inherit (utils.lib) eachDefaultSystem;
-    flake = config:
-      eachDefaultSystem (
-        system:
-        let
-          pkgs = import nixpkgs { inherit system; };
-          tikal =
-            pkgs.callPackage
-            ./tikal.nix
-            { inherit nixpkgs system config nixos-rockchip; };
-        in
-          {
-            packages.default = pkgs.writeScript "tikal" "echo hello tikal!";
-          }
-          // tikal
-      )
-    ;
-    defaults = {};
-  in
-    flake defaults
-    // {
-      override = overrides: flake (defaults // overrides);
-    }
+  outputs = inputs@{ self, flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } ({ withSystem, flake-parts-lib, ... }:
+    let
+      inherit (flake-parts-lib) importApply;
+      flakeModules.default =
+        importApply ./flakeModule.nix { inherit withSystem; tikal-flake = self; };
+    in
+    {
+      imports = [
+        flake-parts.flakeModules.flakeModules
+        # To import an internal flake module: ./other.nix
+        # To import an external flake module:
+        #   1. Add foo to inputs
+        #   2. Add foo as a parameter to the outputs function
+        #   3. Add here: foo.flakeModule
+      ];
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
+      perSystem = { config, self', inputs', pkgs, system, ... }: {
+        # Per-system attributes can be defined here. The self' and inputs'
+        # module parameters provide easy access to attributes of the same
+        # system.
+
+        # Equivalent to  inputs'.nixpkgs.legacyPackages.hello;
+      };
+      flake = {
+        inherit flakeModules;
+        # The usual flake attributes can be defined here, including system-
+        # agnostic ones like nixosModule and system-enumerating ones, although
+        # those are more easily expressed in perSystem.
+        #flakeModules.default = ./flakeModule.nix;
+      };
+    })
   ;
 }

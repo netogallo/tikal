@@ -3,7 +3,7 @@ let
   logger = log.add-context { file = ./test.nix; };
   inherit (lib) strings;
   glob-to-re = strings.replaceStrings [ "." "*" ] [ "\\." ".*" ];
-  match-by-re = re: str: strings.match re str != null;
+  match-by-re = re: str: (logger.log-function-call "match-by-re" strings.match re str) != null;
   process-filter = filter:
     match filter [
       match.is-function (f: f)
@@ -24,7 +24,11 @@ let
       )
     ]
   ;
-  filters = map process-filter test-filters;
+  filters =
+    if builtins.typeOf test-filters != "list"
+    then throw "Unexpected type for test-filters: ${builtins.typeOf test-filters}"
+    else map process-filter (logger.log-value "test-filters" test-filters)
+  ;
 
   fold-attrs-recursive-config = { recurse-derivations = false; };
 
@@ -130,7 +134,7 @@ let
       test-acc = state: key: test:
         let
           test-name = strings.concatStringsSep "." key;
-          has-match = lib.any (f: f test-name) filters; 
+          has-match = logger.log-function-call "has-match" lib.any (f: f test-name) filters; 
         in
           if has-match
           then state ++ [ { name = test-name; inherit test; } ]

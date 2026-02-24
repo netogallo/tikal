@@ -1,15 +1,20 @@
 { lib }:
 let
   inherit (lib) strings;
+  root = "/etc/tikal";
   paths = rec {
     # Todo. Allow configuring in universe module
-    root = "/etc/tikal";
+    inherit root;
     system = "${root}/system";
     keys = "${system}/keys";
     tikal-main = "${keys}/id_tikal";
     tikal-main-pub = "${keys}/id_tikal.pub";
     tikal-main-enc = "${keys}/id_tikal.enc";
     store-secrets = "${root}/store-secrets";
+  };
+  system = {
+    tikal-user = "tikal";
+    tikal-group = "tikal";
   };
   as-relative = _: path:
     if strings.substring 0 5 path == "/etc/"
@@ -22,4 +27,5 @@ in
   # Paths is an attribute set containing the final location
   # in the nixos system of important tikal files.
   paths = paths // { relative = relative-paths; };
+  inherit system;
 }
