@@ -1,5 +1,7 @@
-{ base-dir, lib, shared-context, universe-module }:
+{ lib, tikal-config, shared-context, universe }:
 let
+  universe-module = universe;
+  inherit (tikal-config) base-dir;
   inherit (shared-context) get-tikal-dirs get-nahual-dirs get-config to-nahual;
   build-sync-script = state: spec:
     let

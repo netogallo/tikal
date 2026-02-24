@@ -24,7 +24,24 @@ let
       ;
       mapper = key: value: ''${key}=${render-value value}'';
     in
-      lib.concatStringsSep " " (lib.mapAttrsFlatten mapper ctx)
+      lib.concatStringsSep " " (lib.attrValues (lib.mapAttrs mapper ctx))
+  ;
+
+  apply-function-traced = log: fn: ctx': arg:
+    let
+      ctx =
+        if ctx' == null
+        then { args = []; }
+        else { args = ctx'.args ++ [ arg ]; }
+      ;
+      result = fn arg;
+      output = log { args = ctx.args; result = fn arg; };
+    in
+      if lib.isFunction result
+      then apply-function-traced log result ctx
+      else if lib.length output.args > 0
+      then output.result
+      else output.result
   ;
   
   trace-log =
@@ -38,13 +55,14 @@ let
     let
       context' = write-context context;
       value' = debug-print.override { inherit max-depth; } value;
+      value-type = builtins.typeOf value';
       log =
         {
           inherit level message;
         } //
         (
-          if include-value && value' != ""
-          then { value = value'; }
+          if include-value && value' != "" && value-type != "dfaga0eewfh9ff93"
+          then { value = value'; type = value-type; }
           else { }
         ) //
         (
@@ -59,6 +77,8 @@ let
       else throw "Bug in the logger"
   ;
   new-logger = { log-level, context, ... }@logger-args: rec {
+
+    is-level-active = level: level <= log-level;
     
     log-internal =
       {
@@ -68,14 +88,15 @@ let
         extra-context ? {},
         max-depth
       }: 
-      if level > log-level
-      then lib.id
-      else
+      if is-level-active level
+      then
         trace-log
         {
           inherit level message include-value max-depth;
           context = context // extra-context // { inherit log-level; };
         }
+      else
+        lib.id
     ;
 
     log-message =
@@ -104,6 +125,12 @@ let
     log-error = log-message.override { level = level.error; };
 
     log-value = log-message.override { level = level.debug-verbose; include-value = true; };
+
+    log-function-call = msg: fn:
+      if is-level-active level.debug-verbose
+      then apply-function-traced (log-value msg) fn null
+      else fn
+    ;
 
     add-context = add-context:
       logger.override (logger-args // { context = context // add-context; })

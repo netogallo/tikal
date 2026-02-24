@@ -1,13 +1,13 @@
 {
   tikal,
-  base-dir,
+  tikal-config,
   shared-context,
-  flake-root,
   lib,
   nahuales ? null,
   ...
 }:
 let
+  inherit (tikal-config) base-dir flake-root;
   inherit (shared-context) get-tikal-dirs get-config get-nahual-dirs to-nahual;
   flake-context = {
     tikal-dir = 

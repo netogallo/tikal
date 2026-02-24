@@ -1,4 +1,4 @@
-{ universe, universe-module, docopts, tikal, lib, callPackage, ... }:
+{ universe, sync-module, docopts, tikal, lib, callPackage, ... }:
 let
   inherit (tikal.prelude) do;
   inherit (tikal.xonsh) xsh;
@@ -42,7 +42,7 @@ let
       "|>" make-sync-scripts
   ];
 
-  modules-sync = universe-module.module.config.tikal.sync;
+  modules-sync = sync-module.config.sync;
   # modules-sync-scripts = "${modules-sync-scripts}";
   sync-script = ''
     from docopt import docopt

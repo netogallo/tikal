@@ -1,6 +1,6 @@
 { pkgs, modulesPath, config, ... }:
 let
-  inherit (config.tikal.meta) nahual nahual-private;
+  inherit (config.tikal.meta.apps-context) nahual nahual-private;
   run-qemu =
     pkgs.writeShellApplication
     {

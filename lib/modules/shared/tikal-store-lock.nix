@@ -1,4 +1,4 @@
-{ tikal, pkgs, lib, ... }:
+{ tikal, tikal-flake-context, pkgs, lib, ... }:
 let
   __doc__ = ''
   Tikal relies a lot on "impure" derivations. Although theese derivations are discouraged
@@ -24,7 +24,7 @@ let
   '';
   inherit (tikal.prelude) do test debug-print;
   inherit (tikal.sync) nahual-sync-script sync-script sync-script-tests;
-  inherit (tikal.prelude.template) template;
+  inherit (tikal.template) template;
   inherit (tikal.xonsh) xsh;
   inherit (lib) types mkIf mkOption;
   inherit (tikal.store.lock) get-resource-path hash-key lockfile-name
@@ -115,6 +115,7 @@ in
   test.with-tests
   {
     inherit __doc__ create-sync-script create-locked-derivations to-lock-config;
+    get-resource-path = lib.makeOverridable get-resource-path { lockdir-root = tikal-flake-context.public-dir; };
   }
   {
     tikal.store-lock =

@@ -3,14 +3,12 @@
   lib,
   tikal,
   tikal-store-lock,
-  tikal-log,
   tikal-flake-context,
   tikal-nixos-context,
   ...
 }:
 let
-  inherit (tikal-store-lock.universe) get-resource-path;
-  inherit (tikal-log) logger;
+  inherit (tikal-store-lock) get-resource-path;
   inherit (tikal.store) secrets;
   inherit (tikal.prelude) do;
   inherit (tikal.prelude.test) with-tests;
@@ -25,7 +23,7 @@ let
       secrets.to-nahual-secret {
         inherit name tikal-key text;
         post-decrypt = [
-          (secrets.set-ownership { inherit user group logger; })
+          (secrets.set-ownership { inherit user group; })
         ];
       }
   ;
@@ -59,7 +57,7 @@ let
 
   to-decrypt-script = { name, nahual, ... }:
     secrets.to-decrypt-script {
-      inherit tikal-private-key logger;
+      inherit tikal-private-key;
       secret = get-secret-store-path { inherit name nahual; };
       dest = get-secret-private-path { inherit name; };
     }
@@ -101,12 +99,34 @@ let
       ${post-decryption-scripts}
       ''
   ;
+  locks-all-nahuales = { nahuales, all-nahuales }:
+  let
+    to-all-nahuales-secret = name: { text, user, group, ... }:
+    let
+      to-nahual-secret-config = nahual: {
+        ${nahual} =
+          to-nahual-secret {
+            inherit name nahual text user group;
+          };
+      };
+    in
+      lib.map to-nahual-secret-config nahuales
+    ;
+  in
+    do [
+      all-nahuales
+      "$>" lib.mapAttrs to-all-nahuales-secret
+      "|>" lib.attrValues
+      "|>" lib.concatLists
+      "|>" lib.foldAttrs (item: acc: [item] ++ acc) []
+    ]
+  ;
 in
   with-tests
   {
     inherit to-nahual-secret get-secret-private-path
     get-secret-store-path secrets-activation-script
-    get-secret-public-path;
+    get-secret-public-path locks-all-nahuales;
   }
   {
     tikal.modules.tikal-secrets = {};

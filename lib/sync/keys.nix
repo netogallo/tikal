@@ -1,11 +1,11 @@
-{ universe, openssh, age, expect, tikal, ... }:
+{ sync-module, openssh, age, expect, tikal, ... }:
 let
   inherit (tikal.xonsh) xsh;
 in
 {
   script = xsh.write-script {
     name = "keys.xsh";
-    vars = { nahuales = universe.nahuales; };
+    vars = { inherit (sync-module.config.tikal.context) nahuales; };
     script = { vars, ... }: ''
       from os import path
       import base64

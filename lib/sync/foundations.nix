@@ -1,4 +1,4 @@
-{ universe, tikal, writeTextFile, ... }:
+{ sync-module, tikal, writeTextFile, ... }:
 let
   inherit (tikal.xonsh) xsh;
   gitignore = writeTextFile {
@@ -12,7 +12,7 @@ in
     script = xsh.write-script {
       name = "foundations.xsh";
       vars = {
-        inherit (universe) tikal-dir;
+        inherit (sync-module.config.tikal.context) tikal-dir;
       };
       script = { vars, ... }: ''
         
