@@ -5,6 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixos-rockchip.url = "github:netogallo/nixos-rockchip/feature/ornagepi5b-updates";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    nix-crypto.url = "github:netogallo/nix-crypto";
   };
 
   outputs = inputs@{ self, flake-parts, ... }:

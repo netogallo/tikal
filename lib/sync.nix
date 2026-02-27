@@ -1,8 +1,18 @@
-{ universe, sync-module, docopts, tikal, lib, callPackage, ... }:
+{
+  universe,
+  sync-module,
+  docopts,
+  tikal,
+  lib,
+  pkgs,
+  callPackage,
+  ...
+}:
 let
   inherit (tikal.prelude) do;
   inherit (tikal.xonsh) xsh;
   inherit (tikal.sync) sync-lib;
+  inherit (tikal) crypto;
   foundations = callPackage ./sync/foundations.nix { };
   #core = callPackage ./sync/core.nix { };
   keys = callPackage ./sync/keys.nix { };
@@ -43,7 +53,6 @@ let
   ];
 
   modules-sync = sync-module.config.sync;
-  # modules-sync-scripts = "${modules-sync-scripts}";
   sync-script = ''
     from docopt import docopt
     from sync_lib.core import Tikal
@@ -82,27 +91,43 @@ let
     init_keys(tikal)
 
     ${modules-sync-scripts.package-imports}
+
+    print("The pem is ${crypto.lib.dummy}")
   '';
+  tikal-sync-package =
+    xsh.write-script-bin {
+      name = "sync";
+      script = sync-script;
+      sources = [
+        foundations.script
+        keys.script
+        #core.script
+      ];
+      pythonpath =
+        [ sync-lib.pythonpath
+        ]
+        ++ modules-sync-scripts.package-paths
+      ;
+    }
+  ;
+  tikal-sync-nix-crypto-package =
+    pkgs.writeShellScriptBin
+    "sync"
+    "${crypto.packages.nix-crypto-tikal}/bin/nix run .#tikal-sync-nix-crypto"
+  ;
 in
   rec {
-    package =
-      xsh.write-script-bin {
-        name = "sync";
-        script = sync-script;
-        sources = [
-          foundations.script
-          keys.script
-          #core.script
-        ];
-        pythonpath =
-          [ sync-lib.pythonpath
-          ]
-          ++ modules-sync-scripts.package-paths
-        ;
-      }
-    ;
-    app = {
-      type = "app";
-      program = "${package}/bin/sync";
+    packages = {
+      inherit tikal-sync-package tikal-sync-nix-crypto-package;
+    };
+    apps = {
+      tikal-sync = {
+        type = "app";
+        program = "${packages.tikal-sync-nix-crypto-package}/bin/sync";
+      };
+      tikal-sync-nix-crypto = {
+        type = "app";
+        program = "${packages.tikal-sync-package}/bin/sync";
+      };
     };
   }

@@ -1,6 +1,7 @@
 { tikal-flake, ... }: { self, lib, config, flake-parts-lib, ... }:
 let
-  inherit (tikal-flake.inputs) nixpkgs nixos-rockchip;
+  inherit (tikal-flake.inputs) nixpkgs nixos-rockchip
+    nix-crypto;
   inherit (flake-parts-lib)
     mkPerSystemOption;
   inherit (lib) mkOption types;
@@ -9,7 +10,7 @@ let
   call-tikal-package = module: context:
     lib.callPackageWith
     {
-      inherit lib nixpkgs nixos-rockchip;
+      inherit lib nixpkgs nixos-rockchip nix-crypto;
     }
     module
     (config.tikal // context)
@@ -116,18 +117,21 @@ in
       sync = call-tikal-package ./sync-main.nix { inherit pkgs system; };
       vms = tikal-nixos-main.vms { inherit pkgs; };
       installer = call-tikal-package ./install-main.nix { inherit pkgs system; };
+      get-config-attrs = { packages ? {}, apps ? {}, ... }:
+        { inherit packages apps; }
+      ;
     in
     {
       config = {
-        packages = {
-          tikal-sync = sync.package;
-        }
-        // vms.packages
-        // installer.packages;
-        apps = {
-          tikal-sync = sync.app;
-        }
-        // vms.apps;
+        packages =
+          sync.packages //
+          vms.packages //
+          installer.packages
+        ;
+        apps =
+          sync.apps //
+          vms.apps
+        ;
       };
     });
   };
