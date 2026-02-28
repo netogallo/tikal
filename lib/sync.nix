@@ -6,6 +6,7 @@
   lib,
   pkgs,
   callPackage,
+  tikal-config,
   ...
 }:
 let
@@ -91,8 +92,12 @@ let
     init_keys(tikal)
 
     ${modules-sync-scripts.package-imports}
+    pem = """
+    The pem is:
+    ${crypto.lib.dummy}
+    """
 
-    print("The pem is ${crypto.lib.dummy}")
+    print(pem)
   '';
   tikal-sync-package =
     xsh.write-script-bin {
@@ -113,7 +118,7 @@ let
   tikal-sync-nix-crypto-package =
     pkgs.writeShellScriptBin
     "sync"
-    "${crypto.packages.nix-crypto-tikal}/bin/nix run .#tikal-sync-nix-crypto"
+    "${crypto.packages.nix-crypto-tikal}/bin/nix run ${tikal-config.sync.extra-nix-args} .#tikal-sync-nix-crypto"
   ;
 in
   rec {

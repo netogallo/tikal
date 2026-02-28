@@ -3,6 +3,7 @@
   lib,
   universe,
   flake-root,
+  sync,
   base-dir ? null,
   universe-repository ? null,
   log-level ? 1,
@@ -13,7 +14,7 @@ let
   tikal-config =
     {
       inherit base-dir log-level test-filters flake-root
-        universe-repository;
+        universe-repository sync;
       nixos-version = "25.11";
     }
   ;

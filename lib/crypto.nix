@@ -3,11 +3,13 @@
   pkgs,
   tikal-config,
   lib,
+  newScope,
+  sync-module,
   ...
 }:
 let
-  nix-crypto-scope = lib.makeScope pkgs.newScope (self: {
-    lib = self.callPackage ./cyrpto/default.nix {};
+  nix-crypto-scope = lib.makeScope newScope (self: {
+    lib = self.callPackage ./crypto/default.nix {};
     nix-crypto-lib = self.callPackage "${nix-crypto-flake}/crypto/default.nix" {};
   });
   enabled = nix-crypto-flake != null;
@@ -16,7 +18,7 @@ let
     pkgs.writeShellScriptBin
     "nix"
     ''
-      STORE="$PWD/${tikal-config.base-dir}/.tikal/private/nix-crypto-store"
+      STORE="${sync-module.config.tikal.context.sync.nix-crypto-store}"
       mkdir -p "$STORE"
       ${nix-crypto-pkg}/bin/nix \
         --option extra-cryptonix-args "mode=filesystem&store-path=$STORE" \

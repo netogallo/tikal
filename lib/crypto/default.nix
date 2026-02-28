@@ -1,10 +1,10 @@
 {
   pkgs,
-  nix-crypto,
+  nix-crypto-lib,
   ...
 }:
 let
-  inherit (nix-crypto) openssl;
+  inherit (nix-crypto-lib) openssl;
   pk-rsa = openssl.private-key { 
     attrs = {
       vault = "openssl";

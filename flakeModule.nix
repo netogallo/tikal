@@ -110,6 +110,21 @@ in
         type = types.anything;
         default = {};
       };
+
+      sync = {
+        extra-nix-args = lib.mkOption {
+          description = ''
+            The sync script, which is used to generate secret credentials
+            outside of the store, will invoke this flake recursively using
+            nix with the "nix-crypto" plugin. That means that flags passed
+            to nix when running the flake, like overrides, will get lost.
+            This option allows one to specify flags that will be passed
+            to the recursive nix invocation.
+          '';
+          type = types.str;
+          default = "";
+        };
+      };
     };
 
     perSystem = mkPerSystemOption ({ pkgs, system, ... }:

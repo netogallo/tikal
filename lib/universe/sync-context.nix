@@ -65,9 +65,12 @@ let
       nahuales = universe-module.config.nahuales;
     }
   ;
+  sync-config = {
+    nix-crypto-store = "${config.private-dir}/nix-crypto-store";
+  };
 in
   {
-    inherit config;
+    config = config // { sync = sync-config; };
     # Todo: should the sync scripts be part of the context?
     # inherit sync-scripts;
   }
