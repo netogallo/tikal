@@ -15,10 +15,13 @@ to accomodate both scenarios.
   nahual,
   tikal-config,
   tikal-flake-context,
+  tikal-nixos-context,
+  tikal-nixos,
   platform-name,
   ...
 }:
 let
+  inherit (tikal-nixos-context.tikal-secrets) tikal-private-key tikal-secrets-store-directory;
   inherit (tikal) hardcoded;
   inherit (tikal.template) template template-nix;
   inherit (tikal.xonsh) xsh;
@@ -35,13 +38,18 @@ let
     partuuid = "6299788d-486f-46b0-9092-95c629f7f771";
     fsType = "swap";
   };
-  inherit (tikal-flake-context.nahuales.${nahual}.public.tikal-keys) tikal_main_pub;
+  inherit (tikal-flake-context.nahuales.${nahual}.public) tikal-keys;
+  tikal_main_enc = tikal-nixos.get-public-file {
+    path = tikal-keys.tikal_main_enc;
+    user = "nixos";
+    group = "nixos";
+  };
   make-flake = config:
   let
     args = {
       inherit nahual;
       platform_system = config.platform-system;
-      platform_module = config.platform-module;
+      platform_config = config.platform-config;
       universe = universe.config.universe.id;
       universe_repository =
         if tikal-config.universe-repository == null 
@@ -78,12 +86,13 @@ let
     vars = with pkgs; with config; {
       inherit nahual rootfs bootfs swapfs default-root-device
         default-boot-device bootloader-installer platform-name
-        tikal_main_pub;
+        tikal_main_enc;
       inherit (hardcoded) tikal-decrypt-keys-directory
         tikal-decrypt-master-key-file;
+      tikal-private-key;
       sgdisk = "${pkgs.gptfdisk}/bin/sgdisk";
       curl = "${pkgs.curl}/bin/curl";
-      age = "${pkgs.age}/bin/age";
+      openssl = "${pkgs.openssl}/bin/openssl";
       flake = make-flake config;
     };
     script = template ./tikal-installer/install.xsh vars;

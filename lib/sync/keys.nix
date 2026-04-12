@@ -1,78 +1,16 @@
 { sync-module, openssh, age, expect, tikal, ... }:
 let
   inherit (tikal.xonsh) xsh;
+  inherit (tikal.template) template;
 in
 {
   script = xsh.write-script {
     name = "keys.xsh";
-    vars = { inherit (sync-module.config.tikal.context) nahuales; };
-    script = { vars, ... }: ''
-      from os import path
-      import base64
-      from random import randbytes
-
-      def init_keys_for(tikal, name, nahual):
-
-        private_keys_dir = tikal.get_directory(nahual.private.tikal_keys.root, create=True)
-        public_keys_dir = tikal.get_directory(nahual.public.tikal_keys.root, create=True)
-        tikal_main = tikal.get_file(nahual.private.tikal_keys.tikal_main)
-        tikal_main_pass = tikal.get_file(nahual.private.tikal_keys.tikal_main_pass)
-
-        tikal_main_enc = tikal.get_file(nahual.public.tikal_keys.tikal_main_enc)
-        tikal_main_pub = tikal.get_file(nahual.public.tikal_keys.tikal_main_pub)
-        tikal_main_pub_base = path.basename(tikal_main_pub)
-
-        # If a private key is present, the creation can be skipped as
-        # tikal is meant to be usable even if only public data is available.
-        # However, the encrypted private key is also expected to be present
-        # as it is needed to generate the final image.
-        if path.isfile(tikal_main_pub) and path.isfile(tikal_main_enc):
-          tikal.log_info(f"Found public keys for {name} at '{tikal_main_pub}'. Skipping creation.")
-          return
-        elif path.isfile(tikal_main_pub):
-          raise Exception(f"""
-              Missing ecrypted private key for {name} at '{tikal_main_enc}'.
-              To proceed, you must either delete the public key at '{tikal_main_pub}'
-              or supply the corresponding encrypted private key at '{tikal_main_enc}'
-              """
-          )
-
-        # Fresh set of keys will be created as public keys are not available
-        tikal.log_info(f"Creating fresh tikal keys for {name}")
-        ${openssh}/bin/ssh-keygen -t ed25519 -f f"{tikal_main}" -N ""
-        mv f"{private_keys_dir}/{tikal_main_pub_base}" f"{public_keys_dir}/"
-
-        password = tikal.get_password(name)
-        if password is None:
-          password = base64.b64encode(randbytes(18)).decode()
-
-        # Now we create the encrypted private key
-        with open(tikal_main_pass, 'w') as pf:
-          pf.write(password)
-
-        age_script = f"""
-        spawn ${age}/bin/age --passphrase --armor -o "{tikal_main_enc}" "{tikal_main}"
-        expect "Enter passphrase"
-        send "{password}\r"
-        expect "Confirm passphrase"
-        send "{password}\r"
-        expect {{
-          "error" {{
-            expect eof
-            exit 1
-          }} eof {{
-            exit 0
-          }}
-        }}
-        """
-
-        ${expect}/bin/expect -c f"{age_script}"
-
-      def init_keys(tikal):
-        nahuales = ${vars.nahuales}
-        for name,nahual in nahuales.items():
-          init_keys_for(tikal, name, nahual)
-    '';
+    vars = {
+      inherit (sync-module.config.tikal.context) nahuales;
+      inherit (sync-module.config.tikal.sync.identities) nahual-master-keys;
+    };
+    script = { vars, ... }: template ./keys.xsh { inherit vars; };
   };
 }
 

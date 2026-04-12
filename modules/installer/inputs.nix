@@ -20,22 +20,14 @@ in
           type = types.enum [ "aarch64-linux" "x86_64-linux" ];
         };
 
-        platform-module = mkOption {
+        platform-config = mkOption {
           description = ''
-            This is a path to a nixos module which should contian all the necessary
-            configuration for NixOs to support the platform. It should be as minimal
-            as possible, meaning it should mostly consist of:
-              * Kernel and firmwares needed for the specific platform
-              * The platform specific DTS for ARM systems
-              * The bootloader type. Note that this module is not responsible for
-                installing the bootloader, rather it must make sure that the
-                root/boot partitions will contain all files needed by the bootloader.
-
-            Note that this option is a store path (not an arbitrary module). The reason
-            is that it will get added to the imports of the NixOs configuration
-            when installing the nahual.
+            This contains an attribute set that will be added to
+            the configuration. It should contain all the necessary
+            options to enable the nixos configuration for the
+            platform targeted by the installer.
           '';
-          type = types.path;
+          type = types.anything;
         };
 
         default-root-device = mkOption {

@@ -1,7 +1,8 @@
-{ config, lib, tikal-secrets, ... }:
+{ config, tikal, universe, lib, tikal-secrets, ... }:
 let
+  inherit (tikal.prelude) do;
   inherit (config.tikal.openssh) key-name;
-  inherit (config.tikal.meta) nahuales;
+  inherit (universe.config) nahuales;
   inherit (config.tikal.meta.nixos-context) tikal-user;
   tikal-ssh-secret-name = config.tikal.openssh.secret-name;
 
@@ -12,19 +13,27 @@ let
   every nahual. The public key will be availabe in the store. The function
   below recovers the store path for the ssh public key of every nahual.
   */
-  tikal-ssh-key = nahual: _config:
+  tikal-ssh-key = nahual: config:
     let
       path = tikal-secrets.get-secret-public-path { 
         name = tikal-ssh-secret-name;
         inherit nahual;
       };
     in
-      "${path}/${key-name}.pub"
+      {
+        key = "${path}/${key-name}.pub";
+        administrator = config.remote-access.openssh.administrator;
+      }
   ;
 
   tikal-ssh-keys = lib.mapAttrs tikal-ssh-key nahuales;
 
-  public-ssh-keys = lib.attrValues tikal-ssh-keys;
+  public-ssh-keys = do [
+    tikal-ssh-keys
+    "$>" lib.attrValues
+    "|>" lib.filter (x: x.administrator)
+    "|>" lib.map (x: x.key)
+  ];
 in
   {
     imports = [ ../../shared/remote-access/ssh.nix ];

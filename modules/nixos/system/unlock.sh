@@ -17,30 +17,17 @@ try_get_passphrase_from_cmdline() {
 
 decrypt_tikal_master_key() {
   TMP_KEY=$(mktemp)
-  PASSPHRASE="$1"
-
-  AGE_SCRIPT='
-  spawn ${age} -d -o '"$TMP_KEY"' "${tikal-main-enc.source}"
-  expect "Enter passphrase"
-  send "'"$PASSPHRASE"'\r"
-  expect {
-    "error" {
-      expect eof
-      exit 1
-    } eof {
-      exit 0
-    }
-  }
-  '
-
-  echo "DEBUG age script: $AGE_SCRIPT"
-  ${expect} -c "$AGE_SCRIPT"
+  
+  echo "Attempt decryption of ${tikal-main-enc.source}"
+  PASSPHRASE="$1" ${openssl} enc -d -aes-128-cbc \
+      -pass "env:PASSPHRASE" -iter 600000 -base64 -pbkdf2 \
+      -in "${tikal-main-enc.source}" -out "$TMP_KEY"
   RESULT="$?"
 
   if [ "$RESULT" == "0" ]; then
     mkdir -p "${tikal-decrypt-keys-directory}"
     mv "$TMP_KEY" "${tikal-decrypt-master-key-file}"
-    echo "Success! Decrypted key to /run/keys/tikal/id_tikal"
+    echo "Success! Decrypted key to ${tikal-decrypt-master-key-file}"
     return 0
   else
     echo "Incorrect password was supplied. Try again"
@@ -61,7 +48,7 @@ decrypt_main() {
   fi
 
   while [[ "$success" != "0" ]]; do
-    read -sr -p "Enter SSH key passphrase: " PASSPHRASE
+    read -sr -p "Enter master key passphrase: " PASSPHRASE
     decrypt_tikal_master_key "$PASSPHRASE"
     success="$?"
 

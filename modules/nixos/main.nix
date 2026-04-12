@@ -10,6 +10,7 @@ in
       ./system/unlock.nix
       ./network/tor.nix
       ./remote-access/ssh.nix
+      ../platforms/platforms.nix
     ];
     config = {
       system.name = config.tikal.meta.nahual;

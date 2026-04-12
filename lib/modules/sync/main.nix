@@ -11,10 +11,11 @@ let
     tikal-foundations = self.callPackage ../shared/tikal-foundations.nix {};
     # nahual-pkgs = nahual-pkgs self;
     tikal-store-lock = self.callPackage ../shared/tikal-store-lock.nix {};
-    tikal-secrets = self.callPackage ../tikal-secrets.nix {};
+    tikal-secrets = self.callPackage ./tikal-secrets.nix {};
     tikal-nixos-context = self.callPackage ../tikal-nixos-context.nix {};
     tikal-flake-context = self.callPackage ../tikal-flake-context.nix {};
     tikal-sync-context = sync-context.config;
+    tikal-crypto = self.callPackage ./tikal-crypto.nix {};
   });
 in
   scope

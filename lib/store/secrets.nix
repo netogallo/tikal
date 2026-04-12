@@ -7,7 +7,6 @@ let
   set-ownership =
     { user ? null, group ? null, logger ? null }: { name, ... }:
     let
-      log = with-logger logger;
       # If a specific user/group is supplied, the
       # decrypted directory's ownership is changed
       # to reflect said user/group combination.
@@ -22,7 +21,7 @@ let
       ;
       to-ownership-script = owner: ''
         chown -R ${owner} "$private"
-        ${log} --tag=secrets -d "Setting ownership of ${name} to ${owner}" 
+        $log --tag=secrets -d "Setting ownership of ${name} to ${owner}" 
       '';
       script = do [
         ownership
@@ -62,13 +61,30 @@ let
     in
       pkgs.runCommandLocal name {}
         ''
+        export PATH="${pkgs.openssl}/bin/:$PATH"
         WORKDIR=$(mktemp -d)
         PUBLIC="$WORKDIR/public"
         PRIVATE="$WORKDIR/private"
+
         out="$WORKDIR" public="$PUBLIC" private="$PRIVATE" ${mk-secret}
         mkdir -p "$out"
+        # Hybrid key encryption
+        # Generate the AES random key
+        openssl rand -hex 32 > aes_key.bin
+
+        # Encrypt the symmetric key using the public key
+        openssl pkeyutl -encrypt -pubin \
+            -inkey "${tikal-key}" -in aes_key.bin \
+            -out "$out/key.bin"
+
+        # Encrypt the data using the symmetric key
         ${pkgs.gnutar}/bin/tar -cC "$PRIVATE" . | \
-          ${pkgs.age}/bin/age -R "${tikal-key}" -o "$out/private" 
+          openssl enc -aes-256-cbc -out "$out/private" \
+          -pass file:aes_key.bin -pbkdf2 -nosalt
+
+        # Delete the symmetric un-encrypted symmetric key
+        rm aes_key.bin
+
         mv "$WORKDIR/public" "$out/public"
         mkdir "$out/${post-decrypt-scripts-directory}"
         ${post-decrypt-text}
@@ -83,12 +99,12 @@ let
         ''
         DIR="${secret}/${post-decrypt-scripts-directory}"
         ${log} --tag=secrets \
-          -d "Running post-decrtyp scripts at $DIR"
+          -d "Running post-decrypt scripts at $DIR"
 
         for script_ref in "$DIR"/*; do
           script=$(readlink -f "$script_ref")
         	if [[ -f "$script" && -x "$script" ]]; then
-        		private="${dest}" "$script"
+        		private="${dest}" log="${log}" "$script"
         	else
             ${log} --tag=secrets \
               -e "The script '$script' is not executable. Skipping"
@@ -107,12 +123,20 @@ let
         -d "Decrypging '${dest}' from '${secret}/private' using '${tikal-private-key}'"
 
       # Perform decryption
-      ${pkgs.age}/bin/age -d -i "${tikal-private-key}" "${secret}/private" \
-        | ${pkgs.gnutar}/bin/tar -xC "${dest}"
+      # First, the symmetric key is decrypted using the
+      # tikal master key. This key is used to decrypt
+      # the payload, which will be a tar archive.
+      # The archive then gets extracted to the target
+      # destination
+      ${pkgs.openssl}/bin/openssl pkeyutl -decrypt \
+        -inkey "${tikal-private-key}" \
+        -in "${secret}/key.bin" | \
+      ${pkgs.openssl}/bin/openssl enc -d -aes-256-cbc -pass stdin \
+        -pbkdf2 -nosalt -in "${secret}/private" | \
+      ${pkgs.gnutar}/bin/tar -xC "${dest}"
 
       # Check if decryption was successful
       if [ "$?" != 0 ]; then
-
         # Log error if decryption failed
         ${log} --tag=secrets \
           -e "Decryption failed for '${dest}' using key '${tikal-private-key}'"
@@ -129,5 +153,38 @@ in
     inherit to-nahual-secret to-decrypt-script set-ownership;
   }
   {
-    tikal.store.secrets = {};
+    tikal.store.secrets = {
+      "It can encrypt and decrypt successfully" = { _assert, ... }:
+        let
+          expected = "expected-private";
+          expected-public = "expected-public";
+          make-secret = ''
+            mkdir -p "$private"
+            mkdir -p "$public"
+            echo "${expected}" > "$private/expected.txt"
+            echo "${expected-public}" > "$public/expected.txt"
+          '';
+          keys = pkgs.runCommandLocal "gen-keys" {} ''
+            mkdir "$out"
+            ${pkgs.openssl}/bin/openssl genrsa -out "$out/key.pem"
+            ${pkgs.openssl}/bin/openssl rsa -pubout -in "$out/key.pem" -out "$out/pubkey.pem"
+          '';
+          secret = to-nahual-secret {
+            name = "test-dummy";
+            tikal-key = "${keys}/pubkey.pem";
+            text = make-secret;
+          };
+          decrypt-script = to-decrypt-script {
+            tikal-private-key = "${keys}/key.pem";
+            inherit secret;
+            dest = "$out";
+          };
+          decrypted = pkgs.runCommandLocal "decrypted" {} ''
+            ${decrypt-script}
+          '';
+          actual = builtins.readFile "${decrypted}/expected.txt";
+        in
+          _assert.eq "${expected}\n" actual
+      ;
+    };
   }

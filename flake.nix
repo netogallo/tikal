@@ -5,6 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixos-rockchip.url = "github:netogallo/nixos-rockchip/feature/ornagepi5b-updates";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    nix-crypto.url = "github:netogallo/nix-crypto/main";
   };
 
   outputs = inputs@{ self, flake-parts, ... }:
@@ -31,12 +32,21 @@
 
         # Equivalent to  inputs'.nixpkgs.legacyPackages.hello;
       };
-      flake = {
-        inherit flakeModules;
-        # The usual flake attributes can be defined here, including system-
-        # agnostic ones like nixosModule and system-enumerating ones, although
-        # those are more easily expressed in perSystem.
-        #flakeModules.default = ./flakeModule.nix;
+      flake =
+        flake-parts.lib.mkFlake { inherit inputs; } {
+          imports = [
+            flakeModules.default
+            ./test/flakeModule.nix
+          ];
+          systems = [ "x86_64-linux"];
+          perSystem = { ... }: {};
+        flake = {
+          inherit flakeModules;
+          # The usual flake attributes can be defined here, including system-
+          # agnostic ones like nixosModule and system-enumerating ones, although
+          # those are more easily expressed in perSystem.
+          #flakeModules.default = ./flakeModule.nix;
+        };
       };
     })
   ;

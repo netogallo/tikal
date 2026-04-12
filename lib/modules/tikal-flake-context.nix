@@ -24,12 +24,8 @@ let
     in
       lib.mapAttrs check { tikal-public-key = keys.tikal_main_pub; }
   ;
-  tikal-public-key = args: (tikal-flake-keys args).tikal-public-key;
 in
 {
-  tikal-secrets = {
-    inherit tikal-public-key;
-  };
   inherit (flake-context) flake-root public-dir;
   nahuales = (flake-context.config universe.config.nahuales).nahuales;
 }

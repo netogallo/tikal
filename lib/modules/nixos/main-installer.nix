@@ -17,4 +17,5 @@ in
     tikal-installer = self.callPackage ./tikal-installer.nix {};
     #tikal-platforms = self.callPackage ./tikal-platforms.nix {};
     tikal-flake-context = self.callPackage ../tikal-flake-context.nix {};
+    tikal-nixos = self.callPackage ./tikal-nixos.nix {};
   })

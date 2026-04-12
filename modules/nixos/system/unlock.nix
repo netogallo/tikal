@@ -49,8 +49,7 @@ let
       ./unlock.sh
       {
         inherit tikal-main-enc tikal-paths;
-        age = "${pkgs.age}/bin/age";
-        expect = "${pkgs.expect}/bin/expect";
+        openssl = "${pkgs.openssl}/bin/openssl";
         inherit (hardcoded) tikal-decrypt-keys-directory tikal-decrypt-master-key-file;
       }
     )

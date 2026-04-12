@@ -1,4 +1,6 @@
 from subprocess import CalledProcessError
+from getpass import getpass
+from os import path
 
 $RAISE_SUBPROC_ERROR = True
 
@@ -17,11 +19,11 @@ swap_part_guid = "${swapfs.partuuid}"
 flake = "${flake}"
 sgdisk = "${sgdisk}"
 curl = "${curl}"
+openssl = "${openssl}"
 bootloader_installer = "${bootloader-installer}"
 
-tikal_main_pub = "${tikal_main_pub}"
-tikal_keys_directory = "${tikal-decrypt-keys-directory}"
-tikal_master_key_file = "${tikal-decrypt-master-key-file}"
+tikal_main_enc = "${tikal_main_enc.source}"
+tikal_master_key_file = "/mnt/${tikal-private-key}"
 
 # ------------------------------------------------
 # End of nixos variable declarations
@@ -38,7 +40,7 @@ except CalledProcessError:
 print("\n".join([
   f"Welcome to the Tikal installer for the Nahual '{nahual}'.",
   f"This installer will operate on the disk device '{install_device}'.",
-  f"ALL DATA WILL ON THAT DRIVE WILL BE DESTROYED. To proceed, please",
+  f"ALL DATA ON THAT DRIVE WILL BE DESTROYED. To proceed, please",
   f"type 'YES' followed by enter."]))
 response = input()
 
@@ -52,15 +54,15 @@ print("\n".join([
 
 retries = 0
 
-# Ensure the keys directory exists
-mkdir -p @(tikal_keys_directory)
-
 while True:
   try:
-    # Attempt to decrypt the key with age
     # Todo: ideally, additional approaches to obtain the key
     #       should be supported. ie. OpenTofu
-    @(age) -d -o @(tikal_master_key_file) @(tikal_main_pub)
+    tikal_main_dec = $(
+      $PASSPHRASE=f"{getpass('Master passpharae: ')}" @(openssl) enc -d -aes-128-cbc \
+        -pass "env:PASSPHRASE" -iter 600000 -base64 -pbkdf2 \
+        -in @(tikal_main_enc)
+    )
 
     # Success! Key has been decrypted
     break
@@ -140,6 +142,11 @@ mkdir -p /mnt/etc/nixos/
 mount f"/dev/disk/by-partuuid/{boot_part_guid}" /mnt/boot
 swapon f"/dev/disk/by-partuuid/{swap_part_guid}"
 
+tikal_master_key_dir = path.dirname(tikal_master_key_file)
+mkdir -p @(tikal_master_key_dir)
+chmod 600 @(tikal_master_key_dir)
+echo f"{tikal_main_dec}" > @(tikal_master_key_file)
+
 cp f"{flake}" /mnt/etc/nixos/flake.nix
-nixos-install --flake f"/mnt/etc/nixos#{nahual}"
+nixos-install --root "/mnt/" --flake f"/mnt/etc/nixos#{nahual}"
 

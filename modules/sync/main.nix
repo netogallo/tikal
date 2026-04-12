@@ -2,7 +2,7 @@
 # of this module is to generate the sync script for a universe. Other tikal
 # modules will provide parts which will be combined into the final sync
 # script.
-{ lib, tikal, ... }:
+{ lib, tikal, tikal-crypto, ... }:
 let
   inherit (lib) types mkOption;
   log = tikal.prelude.log.add-context { file = ./main.nix; };
@@ -45,10 +45,12 @@ in
 {
   imports = [
     ./context.nix
+    ./config/identities.nix
     ./config/store-lock.nix
     ./config/secrets.nix
     ./network/tor.nix
     ./remote-access/ssh.nix
+    ./tikal-meta.nix
   ];
   options = {
     sync.scripts = mkOption {

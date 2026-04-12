@@ -12,10 +12,10 @@ let
   log = tikal.prelude.log.add-context { file = ./nixos-main.nix; };
   universe-module = log.log-value "sync-universe" universe-scope.universe;
 
-  top-module = nahual: _: { pkgs, ... }:
+  top-module = nahual: { nixos, ... }: { pkgs, ... }:
     let
       full-scope = scopes.full-scope {
-        inherit nixos-rockchip pkgs;
+        inherit pkgs nixos-rockchip;
       };
       nixos-scope = full-scope.overrideScope (self: super: {
         inherit nahual;
@@ -23,8 +23,9 @@ let
       });
     in
       {
-        imports = [ ./modules/nixos/main.nix ];
+        imports = [ ./modules/nixos/main.nix nixos ];
         config._module.args = {
+          inherit nixos-rockchip;
           # Todo: if the whole "nixos-scope.args" is used. It
           # results in infinite recursion
           inherit (nixos-scope.args)

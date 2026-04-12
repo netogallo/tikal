@@ -120,8 +120,10 @@ class Tikal:
 
     return password
 
-  def get_file(self, loc):
-    return path.join(self.__root__, loc)
+  def get_file(self, loc, create_directory=False):
+    dir = self.get_directory(path.dirname(loc), create=create_directory)
+    file = path.basename(loc)
+    return path.join(dir, file)
 
   def log_info(self, *args, **kwargs):
     return self.log.log_info(*args, **kwargs)

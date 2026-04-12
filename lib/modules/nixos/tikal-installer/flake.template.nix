@@ -11,14 +11,15 @@
   };
   outputs = { self, universe, nixpkgs }:
   let
-    nixosConfigurations = universe.tikal.flake-utils.each-nahual (nahual:
+    flake-nahual = "<% nahual %>";
+    nixosConfigurations = universe.lib.tikal.each-nahual (nahual: _:
       nixpkgs.lib.nixosSystem {
         system = "<% platform_system %>";
         modules = [
           {
             imports = [
               universe.nixosModules.${nahual}
-              <% platform_module %>
+              <% platform_config %>
             ];
             config = {
               fileSystems."/" = {
@@ -39,6 +40,6 @@
     ;
   in
   {
-    nixosConfigurations = nixosConfigurations // { default = nixosConfigurations.${<% nahual %>}; };
+    nixosConfigurations = nixosConfigurations // { default = nixosConfigurations.${flake-nahual}; };
   };
 }

@@ -5,6 +5,7 @@
   universe,
   nixos-rockchip,
   pkgs,
+  nix-crypto,
   ...
 }@inputs:
 let
@@ -12,7 +13,7 @@ let
   inherit (scopes) universe-scope;
   inherit (universe-scope) tikal lib;
   log = tikal.prelude.log.add-context { file = ./sync-main.nix; };
-  full-scope = scopes.full-scope { inherit pkgs nixos-rockchip; };
+  full-scope = scopes.full-scope { inherit pkgs nixos-rockchip nix-crypto; };
 
   # Construct the scope that will be used when
   # evaluating the sync module
@@ -20,7 +21,7 @@ let
 
     # After computing the universe, the "sync" module needs
     # to be constructed and evaluated.
-    sync-module = log.log-value "universe-module" (lib.evalModules {
+    sync-module = log.log-value "sync-module" (lib.evalModules {
       modules = [
         ./modules/sync/main.nix
         {

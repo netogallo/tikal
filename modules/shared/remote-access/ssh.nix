@@ -4,6 +4,7 @@ let
   secret-name = universe.config.remote-access.openssh.secret-name;
   inherit (pkgs) openssh;
   key-name = "id_ed25519";
+  inherit (config.tikal.meta.nixos-context) tikal-user tikal-group;
 
   /**
   Script which generates a private/public openssh key pair. The private
@@ -55,8 +56,8 @@ in
       secrets.all-nahuales = {
         ${secret-name} = {
           text = gen-key-script;
-          user = "tikal";
-          group = "tikal";
+          user = tikal-user;
+          group = tikal-group;
         };
       };
     };

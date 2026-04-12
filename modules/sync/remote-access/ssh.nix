@@ -1,7 +1,7 @@
 { ... }:
 let
-  x = {};
+  imports = [ ../../shared/remote-access/ssh.nix ];
 in
 {
-  imports = [ ../../shared/remote-access/ssh.nix ];
+  inherit imports;
 }

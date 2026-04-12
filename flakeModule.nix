@@ -1,6 +1,7 @@
 { tikal-flake, ... }: { self, lib, config, flake-parts-lib, ... }:
 let
-  inherit (tikal-flake.inputs) nixpkgs nixos-rockchip;
+  inherit (tikal-flake.inputs) nixpkgs nixos-rockchip
+    nix-crypto;
   inherit (flake-parts-lib)
     mkPerSystemOption;
   inherit (lib) mkOption types;
@@ -9,7 +10,7 @@ let
   call-tikal-package = module: context:
     lib.callPackageWith
     {
-      inherit lib nixpkgs nixos-rockchip;
+      inherit lib nixpkgs nixos-rockchip nix-crypto;
     }
     module
     (config.tikal // context)
@@ -28,6 +29,9 @@ in
 {
   config.flake = {
     inherit (tikal-nixos-main) nixosModules;
+    lib.tikal = {
+      each-nahual = fn: lib.mapAttrs fn config.tikal.universe.nahuales;
+    };
   };
   options = {
     tikal = {
@@ -109,6 +113,21 @@ in
         type = types.anything;
         default = {};
       };
+
+      sync = {
+        extra-nix-args = lib.mkOption {
+          description = ''
+            The sync script, which is used to generate secret credentials
+            outside of the store, will invoke this flake recursively using
+            nix with the "nix-crypto" plugin. That means that flags passed
+            to nix when running the flake, like overrides, will get lost.
+            This option allows one to specify flags that will be passed
+            to the recursive nix invocation.
+          '';
+          type = types.str;
+          default = "";
+        };
+      };
     };
 
     perSystem = mkPerSystemOption ({ pkgs, system, ... }:
@@ -116,18 +135,21 @@ in
       sync = call-tikal-package ./sync-main.nix { inherit pkgs system; };
       vms = tikal-nixos-main.vms { inherit pkgs; };
       installer = call-tikal-package ./install-main.nix { inherit pkgs system; };
+      get-config-attrs = { packages ? {}, apps ? {}, ... }:
+        { inherit packages apps; }
+      ;
     in
     {
       config = {
-        packages = {
-          tikal-sync = sync.package;
-        }
-        // vms.packages
-        // installer.packages;
-        apps = {
-          tikal-sync = sync.app;
-        }
-        // vms.apps;
+        packages =
+          sync.packages //
+          vms.packages //
+          installer.packages
+        ;
+        apps =
+          sync.apps //
+          vms.apps
+        ;
       };
     });
   };

@@ -1,11 +1,26 @@
-{ universe, sync-module, docopts, tikal, lib, callPackage, ... }:
+{
+  universe,
+  sync-module,
+  docopts,
+  tikal,
+  lib,
+  pkgs,
+  callPackage,
+  tikal-config,
+  newScope,
+  ...
+}:
 let
   inherit (tikal.prelude) do;
   inherit (tikal.xonsh) xsh;
   inherit (tikal.sync) sync-lib;
-  foundations = callPackage ./sync/foundations.nix { };
-  #core = callPackage ./sync/core.nix { };
-  keys = callPackage ./sync/keys.nix { };
+  inherit (tikal) crypto;
+
+  sync-scope = lib.makeScope newScope (self: {
+    foundations = self.callPackage ./sync/foundations.nix {};
+    keys = self.callPackage ./sync/keys.nix {};
+  });
+  inherit (sync-scope) foundations keys;
   to-sync-script-module = { name, packages }:
     let
       package-instance = packages { inherit universe; };
@@ -43,7 +58,6 @@ let
   ];
 
   modules-sync = sync-module.config.sync;
-  # modules-sync-scripts = "${modules-sync-scripts}";
   sync-script = ''
     from docopt import docopt
     from sync_lib.core import Tikal
@@ -83,26 +97,65 @@ let
 
     ${modules-sync-scripts.package-imports}
   '';
+  tikal-sync-package =
+    xsh.write-script-bin {
+      name = "sync";
+      script = sync-script;
+      sources = [
+        foundations.script
+        keys.script
+        #core.script
+      ];
+      pythonpath =
+        [ sync-lib.pythonpath
+        ]
+        ++ modules-sync-scripts.package-paths
+      ;
+    }
+  ;
+  nix-crypto-tikal = crypto.nix-crypto-tikal {
+    nix-crypto-store = sync-module.config.tikal.context.sync.nix-crypto-store;
+  };
+  tikal-sync-nix-crypto-package =
+    pkgs.writeShellScriptBin
+    "sync"
+    ''
+    ${nix-crypto-tikal}/bin/nix run --show-trace ${tikal-config.sync.extra-nix-args} .#tikal-sync-nix-crypto
+    ''
+  ;
+  /**
+  This module produces two sets of outputs. One of them require the `nix-crypto` plugin to be
+  loaded in nix. These outputs will be removed if the plugin is not available. When the plugin
+  is not available, the `sync` command will simply re-invoke the sync operation with the
+  nix-crypto plugin enabled.
+  */
+  mk-if-crypto = value:
+    if crypto.enabled
+    then value
+    else {}
+  ;
 in
   rec {
-    package =
-      xsh.write-script-bin {
-        name = "sync";
-        script = sync-script;
-        sources = [
-          foundations.script
-          keys.script
-          #core.script
-        ];
-        pythonpath =
-          [ sync-lib.pythonpath
-          ]
-          ++ modules-sync-scripts.package-paths
-        ;
+    packages =
+      mk-if-crypto {
+        inherit tikal-sync-package;
+      } //
+      {
+        inherit tikal-sync-nix-crypto-package;
       }
     ;
-    app = {
-      type = "app";
-      program = "${package}/bin/sync";
-    };
+    apps =
+      {
+        tikal-sync = {
+          type = "app";
+          program = "${packages.tikal-sync-nix-crypto-package}/bin/sync";
+        };
+      } //
+      mk-if-crypto {
+        tikal-sync-nix-crypto = {
+          type = "app";
+          program = "${packages.tikal-sync-package}/bin/sync";
+        };
+      }
+    ;
   }

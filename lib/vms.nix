@@ -29,6 +29,10 @@ let
             boot.loader.grub.enable = false;
 		        networking.useDHCP = true;
 
+            environment.systemPackages = with pkgs; [
+              openssl
+            ];
+
             # The password is set to tikal for the VM
             users.users.${tikal-user}.hashedPassword = "$y$j9T$Ij.zgsiQ9UbG805vuIjz0/$qiZCBxun/3VJrAic6AGusQTlX4VN2W.Mp4LrFPrFZ6B";
 

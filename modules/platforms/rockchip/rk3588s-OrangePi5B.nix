@@ -1,14 +1,28 @@
-{ tikal-platforms, ... }:
+{
+  tikal-platforms,
+  lib,
+  config,
+  ...
+}:
 let
   inherit (tikal-platforms.rockchip) rk3588s-OrangePi5B;
+  inherit (lib) mkOption mkIf types;
+  inherit (config.tikal.platforms.rockchip.rk3588s-OrangePi5B) enable;
 in
   {
-    config = with rk3588s-OrangePi5B; {
+    options = {
+      tikal.platforms.rockchip.rk3588s-OrangePi5B.enable = mkOption {
+        description = "Enable the configuration for the OrangePi5B SBC";
+        type = types.bool;
+        default = false;
+      };
+    };
+    config = mkIf enable {
       nixpkgs.hostPlatform = rk3588s-OrangePi5B.system;
       boot.kernelPackages = rk3588s-OrangePi5B.kernel;
       hardware = {
-        inherit firmware;
-        deviceTree = device-tree;
+        inherit (rk3588s-OrangePi5B) firmware;
+        deviceTree = rk3588s-OrangePi5B.device-tree;
       };
 
       # Non-Free Needed for firmware
@@ -18,8 +32,6 @@ in
         generic-extlinux-compatible.enable = true;
         grub.enable = false;
       };
-
-      rockchip.uBoot = rk3588s-OrangePi5B.uboot;
 
       # ZFS must be disabled for arm systems
       nixpkgs.overlays = [

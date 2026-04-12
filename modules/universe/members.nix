@@ -14,7 +14,6 @@ in
   {
   	options.nahuales = lib.mkOption {
   		type = types.attrsOf nahual;
-  		default = {};
   		description = "The nahuales that will exist in your universe.";
   	};
   }

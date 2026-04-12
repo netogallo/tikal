@@ -15,7 +15,7 @@ let
 
       # Read the bootloader spec from the
       # standard input.
-      spec = json.load(sys.stdin.read())
+      spec = json.load(sys.stdin)
 
       install_device = spec["config"]["bootDevice"]
 

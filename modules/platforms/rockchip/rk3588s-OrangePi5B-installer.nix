@@ -8,7 +8,7 @@
 let
   inherit (tikal-platforms.rockchip) rk3588s-OrangePi5B;
   bootloader-installer = tikal-rockchip.uboot-installer {
-    uboot-image = rk3588s-OrangePi5B.uboot;
+    uboot-image = "${rk3588s-OrangePi5B.uboot}/u-boot-rockchip.bin";
   };
 in
 {
@@ -17,10 +17,12 @@ in
     ./rk3588s-OrangePi5B.nix
   ];
   config = {
+    rockchip.uBoot = rk3588s-OrangePi5B.uboot;
+    tikal.platforms.rockchip.rk3588s-OrangePi5B.enable = true;
     tikal.installer = {
       platform-name = "rk3588s-OrangePi5B";
       platform-system = rk3588s-OrangePi5B.system;
-      platform-module = ./rk3588s-OrangePi5B.nix;
+      platform-config = "{ tikal.platforms.rockchip.rk3588s-OrangePi5B.enable = true; }";
       default-root-device = "/dev/mmcblk0";
       default-boot-device = "/dev/mmcblk0";
       inherit bootloader-installer;
