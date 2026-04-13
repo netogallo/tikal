@@ -89,7 +89,7 @@ let
         tikal_main_enc;
       inherit (hardcoded) tikal-decrypt-keys-directory
         tikal-decrypt-master-key-file;
-      tikal-private-key;
+      inherit tikal-private-key;
       sgdisk = "${pkgs.gptfdisk}/bin/sgdisk";
       curl = "${pkgs.curl}/bin/curl";
       openssl = "${pkgs.openssl}/bin/openssl";
