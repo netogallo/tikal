@@ -31,7 +31,7 @@ let
   public-ssh-keys = do [
     tikal-ssh-keys
     "$>" lib.attrValues
-    "|>" lib.filter (x: x.administrator)
+"|>" lib.filter (x: x.administrator)
     "|>" lib.map (x: x.key)
   ];
 in
