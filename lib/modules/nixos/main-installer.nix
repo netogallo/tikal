@@ -19,4 +19,5 @@ in
     tikal-flake-context = self.callPackage ../tikal-flake-context.nix {};
     tikal-nixos = self.callPackage ./tikal-nixos.nix {};
     tikal-nixos-context = self.callPackage ../tikal-nixos-context.nix {};
+    tikal-foundations = self.callPackage ../shared/tikal-foundations.nix {};
   })
