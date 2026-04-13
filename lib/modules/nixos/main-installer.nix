@@ -18,4 +18,5 @@ in
     #tikal-platforms = self.callPackage ./tikal-platforms.nix {};
     tikal-flake-context = self.callPackage ../tikal-flake-context.nix {};
     tikal-nixos = self.callPackage ./tikal-nixos.nix {};
+    tikal-nixos-context = self.callPackage ../tikal-nixos-context.nix {};
   })
