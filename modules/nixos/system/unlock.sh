@@ -39,6 +39,8 @@ decrypt_main() {
   PASSPHRASE="$(try_get_passphrase_from_cmdline)"
   success="$?"
 
+  bash
+
   if [[ "$success" == 0 ]]; then
     decrypt_tikal_master_key "$PASSPHRASE"
     success="$?"

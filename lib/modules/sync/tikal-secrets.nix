@@ -13,19 +13,21 @@ let
   inherit (tikal-crypto) nahual-master-keys;
 
   to-nahual-secret-derivation =
-    { name, nahual, text, user ? null, group ? null }:
+    { name, nahual, text, user ? null, group ? null, post-decrypt ? [] }:
     let
       tikal-key = nahual-master-keys.${nahual}.public-key-file;
+      extra-post-decrypt = map secrets.to-post-decrypt-script post-decrypt;
     in
       secrets.to-nahual-secret {
         inherit name tikal-key text;
         post-decrypt = [
           (secrets.set-ownership { inherit user group; })
-        ];
+        ]
+        ++ extra-post-decrypt;
       }
   ;
 
-  to-nahual-secret = args@{ name, nahual, text, user ? null, group ? null }:
+  to-nahual-secret = args@{ name, nahual, ... }:
     {
       derive = to-nahual-secret-derivation args;
       key = get-secret-key { inherit name nahual; };
@@ -49,13 +51,10 @@ let
   */
   locks-all-nahuales = { nahuales, all-nahuales }:
     let
-      to-all-nahuales-secret = name: { text, user, group, ... }:
+      to-all-nahuales-secret = name: args:
       let
         to-nahual-secret-config = nahual: {
-          ${nahual} =
-            to-nahual-secret {
-              inherit name nahual text user group;
-            };
+          ${nahual} = to-nahual-secret (args // { inherit name; inherit nahual; });
         };
       in
         lib.map to-nahual-secret-config nahuales

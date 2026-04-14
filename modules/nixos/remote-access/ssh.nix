@@ -3,7 +3,7 @@ let
   inherit (tikal.prelude) do;
   inherit (config.tikal.openssh) key-name;
   inherit (universe.config) nahuales;
-  inherit (config.tikal.meta.nixos-context) tikal-user;
+  inherit (config.tikal.meta.nixos-context.tikal-users) tikal-root;
   tikal-ssh-secret-name = config.tikal.openssh.secret-name;
 
   /**
@@ -42,6 +42,6 @@ in
         enable = true;
         settings.PasswordAuthentication = false;
       };
-      users.users.${tikal-user}.openssh.authorizedKeys.keyFiles = public-ssh-keys;
+      users.users.${tikal-root.user}.openssh.authorizedKeys.keyFiles = public-ssh-keys;
     };
   }

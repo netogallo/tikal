@@ -17,7 +17,9 @@ Currently, the following methods are supported to make the private key available
 let
   inherit (tikal) hardcoded;
   inherit (tikal.template) template;
-  inherit (config.tikal.meta.nixos-context) tikal-user tikal-group;
+  inherit (config.tikal.meta.nixos-context.tikal-users) tikal-root;
+  tikal-user = tikal-root.user;
+  tikal-group = tikal-root.group;
   inherit (tikal-nixos) get-public-file;
   inherit (tikal-flake-context.nahuales.${nahual}.public) tikal-keys;
   log = tikal.prelude.log.add-context { file = ./tikal-core.nix; inherit nahual; };

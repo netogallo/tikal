@@ -5,7 +5,7 @@ let
   inherit (pkgs) openssh;
   key-name = "id_ed25519";
 
-  inherit (config.tikal.meta.tikal-users) tikal-root;
+  inherit (config.tikal.meta.nixos-context.tikal-users) tikal-root;
 
   /**
   Script which generates a private/public openssh key pair. The private
@@ -61,17 +61,24 @@ in
           group = tikal-root.group;
           post-decrypt = [
             {
+              name = "copy-keys";
               text = ''
-                ssh="${tikal-root.home}/.ssh/"
-                mkdir -p "$ssh"
+                set -euo
 
-                cp "$private/${key-name}" "$ssh"
-                cp "$public/${key-name}.pub" "$ssh"
+                ssh="${tikal-root.home}/.ssh"
+                $log --tag=ssh "Adding the key $private/${key-name} to $ssh"
+
+                if [[ ! -d "$ssh" ]]; then
+                  mkdir -p "$ssh"
+                  chmod 0700 "$ssh"
+                fi
+
+                cp -f "$private/${key-name}" "$ssh/${key-name}"
+                cp -f "$public/${key-name}.pub" "$ssh/${key-name}.pub"
 
                 chown -R "${tikal-root.user}:${tikal-root.group}" "$ssh"
-                chmod 0700 "$ssh"
-                chmod 0600 "$ssh/${key-name}"
-                chmod 0544 "$ssh/${key-name}.pub" 
+                chmod 600 "$ssh/${key-name}"
+                chmod 644 "$ssh/${key-name}.pub"
               '';
             }
           ];

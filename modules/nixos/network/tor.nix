@@ -3,7 +3,7 @@ let
   inherit (tikal.prelude) do;
   inherit (tikal.xonsh) xsh;
   inherit (lib) mkIf;
-  inherit (config.tikal.meta.nixos-context) tikal-user;
+  inherit (config.tikal.meta.nixos-context.tikal-users) tikal-root;
   inherit (config.tikal.meta) nahuales;
 
   tor-socks-port = config.tikal.tor.socks-port;
@@ -91,7 +91,7 @@ let
           'ProxyCommand="${pkgs.netcat}/bin/nc -x 127.0.0.1:${builtins.toString tor-socks-port} -X 5 %h %p"',
           "-i",
           f"{ssh_key}",
-          f"${tikal-user}@{host}"
+          f"${tikal-root.user}@{host}"
         ]
         cmd = " ".join(cmd_parts)
 

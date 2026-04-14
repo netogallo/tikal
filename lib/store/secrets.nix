@@ -31,6 +31,13 @@ let
     in
       pkgs.writeScript "post-decrypt-${name}" script
   ;
+
+  to-post-decrypt-script = { name, text }: args:
+    let
+      script = pkgs.writeScript "post-decrypt-${name}-${args.name}" text;
+    in
+      script
+  ;
   # Create a derivation containing an encrypted secret. This function
   # accepts a public key and a procedure to generate a secret. It then
   # creates a derivation that uses the procedure to generate a secret
@@ -150,7 +157,7 @@ let
 in
   with-tests
   {
-    inherit to-nahual-secret to-decrypt-script set-ownership;
+    inherit to-nahual-secret to-decrypt-script set-ownership to-post-decrypt-script;
   }
   {
     tikal.store.secrets = {
