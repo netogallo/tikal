@@ -28,6 +28,9 @@ in
       ../../shared/config/secrets.nix
     ];
     config = mkIf config.secrets.enable {
-      system.activationScripts.tikal-secrets-activate.text = secrets-activation-scripts;
+      system.activationScripts.tikal-secrets-activate = {
+        text = secrets-activation-scripts;
+        deps = [ config.tikal.core.init-script-name ];
+      };
     };
   }

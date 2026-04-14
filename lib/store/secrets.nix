@@ -111,7 +111,7 @@ let
         for script_ref in "$DIR"/*; do
           script=$(readlink -f "$script_ref")
         	if [[ -f "$script" && -x "$script" ]]; then
-        		private="${dest}" log="${log}" "$script"
+        		private="${dest}" public="${secret}/public" log="${log}" "$script"
         	else
             ${log} --tag=secrets \
               -e "The script '$script' is not executable. Skipping"
