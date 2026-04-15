@@ -9,10 +9,14 @@ let
     get-secret-public-path get-secret-private-path;
   get-activation-scripts = { nahual, all-nahuales }:
     let
-      keys-from-secret = name: get-secret-key { inherit name nahual; };
-      keys = lib.map keys-from-secret (lib.attrNames all-nahuales);
+      to-secret = name: secret: {
+        key = { inherit name nahual; };
+        inherit secret;
+      };
+
+      secrets = lib.mapAttrs to-secret all-nahuales;
     in
-      secrets-activation-script keys
+      secrets-activation-script (lib.attrValues secrets)
   ;
 in
   {

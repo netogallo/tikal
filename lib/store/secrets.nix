@@ -5,7 +5,7 @@ let
   inherit (tikal.syslog) with-logger;
   post-decrypt-scripts-directory = "post_decrypt";
   set-ownership =
-    { user ? null, group ? null, logger ? null }: { name, ... }:
+    { name, user ? null, group ? null, logger ? null }:
     let
       # If a specific user/group is supplied, the
       # decrypted directory's ownership is changed
@@ -23,21 +23,25 @@ let
         chown -R ${owner} "$private"
         $log --tag=secrets -d "Setting ownership of ${name} to ${owner}" 
       '';
-      script = do [
+      text = do [
         ownership
         "$>" lib.map to-ownership-script
         "|>" lib.concatStringsSep "\n"
       ];
     in
-      pkgs.writeScript "post-decrypt-${name}" script
+      {
+        name = "set-ownership-${name}";
+        inherit text;
+      }
   ;
 
-  to-post-decrypt-script = { name, text }: args:
+  to-post-decrypt-script = { name, text, ... }:
     let
-      script = pkgs.writeScript "post-decrypt-${name}-${args.name}" text;
+      script = pkgs.writeScript "post-decrypt-${name}" text;
     in
       script
   ;
+
   # Create a derivation containing an encrypted secret. This function
   # accepts a public key and a procedure to generate a secret. It then
   # creates a derivation that uses the procedure to generate a secret
@@ -49,22 +53,6 @@ let
   to-nahual-secret = { name, tikal-key, text, post-decrypt ? [] }:
     let
       mk-secret = pkgs.writeScript name text;
-      link-post-decrypt-scripts = script:
-        # Todo: ideally, we should use symlinks, but
-        # this is tricky as the system running sync
-        # might not be the one running the post-decrypt
-        # stages. Therefore, we must copy.
-        ''
-        cp ${script} "$out/${post-decrypt-scripts-directory}/"
-        chmod +x "$out/${post-decrypt-scripts-directory}/"
-        ''
-      ;
-      post-decrypt-text = do [
-        post-decrypt
-        "$>" map (mk-script: mk-script { inherit name; })
-        "|>" map link-post-decrypt-scripts
-        "|>" lib.concatStringsSep "\n"
-      ];
     in
       pkgs.runCommandLocal name {}
         ''
@@ -93,30 +81,26 @@ let
         rm aes_key.bin
 
         mv "$WORKDIR/public" "$out/public"
-        mkdir "$out/${post-decrypt-scripts-directory}"
-        ${post-decrypt-text}
         rm -rf "$WORKDIR"
         ''
   ;
 
-  to-decrypt-script = { tikal-private-key, secret, dest, logger ? null }:
+  to-decrypt-script = { tikal-private-key, secret, post-decrypt, dest, logger ? null }:
     let
       log = with-logger logger;
-      post-decrypt = pkgs.writeScript "post-decrypt"
+      run-script = script: ''private="${dest}" public="${secret}/public" log="${log}" ${script}'';
+      scripts = do [
+        post-decrypt
+        "$>" lib.map to-post-decrypt-script
+        "|>" lib.map run-script
+        "|>" lib.concatStringsSep "\n"
+      ];
+      post-decrypt-combined = pkgs.writeScript "post-decrypt"
         ''
-        DIR="${secret}/${post-decrypt-scripts-directory}"
+        DIR="${secret}"
         ${log} --tag=secrets \
-          -d "Running post-decrypt scripts at $DIR"
-
-        for script_ref in "$DIR"/*; do
-          script=$(readlink -f "$script_ref")
-        	if [[ -f "$script" && -x "$script" ]]; then
-        		private="${dest}" public="${secret}/public" log="${log}" "$script"
-        	else
-            ${log} --tag=secrets \
-              -e "The script '$script' is not executable. Skipping"
-        	fi
-        done
+          -d "Running post-decrypt scripts scripts for $DIR"
+        ${scripts}
         ''
       ;
     in
@@ -149,7 +133,7 @@ let
           -e "Decryption failed for '${dest}' using key '${tikal-private-key}'"
         read -sr -p "Press enter to continue: " X
       else
-        (cd "${dest}"; ${post-decrypt})
+        (cd "${dest}"; ${post-decrypt-combined})
       fi
       ''
   ;
@@ -185,6 +169,7 @@ in
             tikal-private-key = "${keys}/key.pem";
             inherit secret;
             dest = "$out";
+            post-decrypt = [];
           };
           decrypted = pkgs.runCommandLocal "decrypted" {} ''
             ${decrypt-script}
