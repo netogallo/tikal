@@ -17,7 +17,7 @@ let
     let
       vm-config = { config, pkgs, ... }:
         let
-          tikal-user = config.tikal.meta.nixos-context.tikal-user;
+          tikal-user = config.tikal.meta.nixos-context.tikal-users.tikal-root.user;
         in
         {
           imports = [

@@ -18,16 +18,22 @@ try_get_passphrase_from_cmdline() {
 decrypt_tikal_master_key() {
   TMP_KEY=$(mktemp)
   
-  echo "Attempt decryption of ${tikal-main-enc.source}"
+  echo "Attempt decryption of ${tikal-secrets.tikal-private-key-enc}"
   PASSPHRASE="$1" ${openssl} enc -d -aes-128-cbc \
       -pass "env:PASSPHRASE" -iter 600000 -base64 -pbkdf2 \
-      -in "${tikal-main-enc.source}" -out "$TMP_KEY"
+      -in "${tikal-secrets.tikal-private-key-enc}" -out "$TMP_KEY"
   RESULT="$?"
 
   if [ "$RESULT" == "0" ]; then
-    mkdir -p "${tikal-decrypt-keys-directory}"
-    mv "$TMP_KEY" "${tikal-decrypt-master-key-file}"
-    echo "Success! Decrypted key to ${tikal-decrypt-master-key-file}"
+
+    key_dir=$(dirname "${tikal-secrets.tikal-private-key}")
+    mkdir -p "$key_dir"
+    mv "$TMP_KEY" "${tikal-secrets.tikal-private-key}"
+
+    chown -R "${tikal-user}:${tikal-group}" "$key_dir"
+    chmod 700 "$key_dir"
+    chmod 600 "${tikal-secrets.tikal-private-key}"
+    echo "Success! Decrypted key to ${tikal-secrets.tikal-private-key}"
     return 0
   else
     echo "Incorrect password was supplied. Try again"
@@ -59,6 +65,9 @@ decrypt_main() {
   done
 }
 
-if [ ! -f "${tikal-paths.tikal-main}" ]; then
+if [ ! -f "${tikal-secrets.tikal-private-key}" ]; then
+  ${log} --tag=unlock -d "Attempting decryption of '${tikal-secrets.tikal-private-key}'"
   decrypt_main
+else
+  ${log} --tag=unlock -d "The key '${tikal-secrets.tikal-private-key}' is ready."
 fi

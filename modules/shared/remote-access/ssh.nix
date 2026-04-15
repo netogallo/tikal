@@ -4,7 +4,8 @@ let
   secret-name = universe.config.remote-access.openssh.secret-name;
   inherit (pkgs) openssh;
   key-name = "id_ed25519";
-  inherit (config.tikal.meta.nixos-context) tikal-user tikal-group;
+
+  inherit (config.tikal.meta.nixos-context.tikal-users) tikal-root;
 
   /**
   Script which generates a private/public openssh key pair. The private
@@ -56,8 +57,31 @@ in
       secrets.all-nahuales = {
         ${secret-name} = {
           text = gen-key-script;
-          user = tikal-user;
-          group = tikal-group;
+          user = tikal-root.user;
+          group = tikal-root.group;
+          post-decrypt = [
+            {
+              name = "copy-keys";
+              text = ''
+                set -euo
+
+                ssh="${tikal-root.home}/.ssh"
+                $log --tag=ssh "Adding the key $private/${key-name} to $ssh"
+
+                if [[ ! -d "$ssh" ]]; then
+                  mkdir -p "$ssh"
+                  chmod 0700 "$ssh"
+                fi
+
+                cp -f "$private/${key-name}" "$ssh/${key-name}"
+                cp -f "$public/${key-name}.pub" "$ssh/${key-name}.pub"
+
+                chown -R "${tikal-root.user}:${tikal-root.group}" "$ssh"
+                chmod 600 "$ssh/${key-name}"
+                chmod 644 "$ssh/${key-name}.pub"
+              '';
+            }
+          ];
         };
       };
     };

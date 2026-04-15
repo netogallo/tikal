@@ -1,2 +1,0 @@
-chown -R tikal-root:tikal-root "$private"
-$log --tag=secrets -d "Setting ownership of tikal-ssh to tikal-root:tikal-root" 

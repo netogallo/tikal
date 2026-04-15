@@ -1,7 +1,7 @@
 { lib, config, ... }:
 let
   inherit (lib) types mkOption;
-  inherit (config.tikal.meta.nixos-context) tikal-user tikal-group;
+  inherit (config.tikal.meta.nixos-context.tikal-users) tikal-root;
 in
   {
     imports = [
@@ -15,12 +15,12 @@ in
     config = {
       system.name = config.tikal.meta.nahual;
       networking.hostName = config.tikal.meta.nahual;
-      users.users.${tikal-user} = {
+      users.users.${tikal-root.user} = {
         isNormalUser = true;
-        group = tikal-group;
+        group = tikal-root.group;
         extraGroups = [ "wheel" ];
       };
-      users.groups.${tikal-group} = {};
+      users.groups.${tikal-root.group} = {};
       security.sudo.enable = true;
     };
   }

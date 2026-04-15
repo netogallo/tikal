@@ -13,29 +13,28 @@ Currently, the following methods are supported to make the private key available
   be then used to decrypt the private key and make it availabe at a specific
   (ephemeral) location.
 */
-{ pkgs, config, nahual, lib, tikal, tikal-flake-context, tikal-foundations, tikal-nixos, ... }:
+{
+  pkgs,
+  config,
+  nahual,
+  lib,
+  tikal,
+  tikal-flake-context,
+  tikal-foundations,
+  tikal-nixos,
+  ...
+}:
 let
-  inherit (tikal) hardcoded;
+  inherit (lib) mkOption types;
+  inherit (tikal.prelude) path;
   inherit (tikal.template) template;
-  inherit (config.tikal.meta.nixos-context) tikal-user tikal-group;
+  inherit (config.tikal.meta.nixos-context) tikal-secrets;
+  inherit (config.tikal.meta.nixos-context.tikal-users) tikal-root;
   inherit (tikal-nixos) get-public-file;
-  inherit (tikal-flake-context.nahuales.${nahual}.public) tikal-keys;
+  inherit (tikal.syslog) with-logger;
+  tikal-user = tikal-root.user;
+  tikal-group = tikal-root.group;
   log = tikal.prelude.log.add-context { file = ./tikal-core.nix; inherit nahual; };
-  tikal-paths = tikal-foundations.paths;
-  tikal-main-pub =
-    get-public-file {
-      path = tikal-keys.tikal_main_pub;
-      user = tikal-user;
-      group = tikal-group;
-    }
-  ;
-  tikal-main-enc =
-    get-public-file {
-      path = tikal-keys.tikal_main_enc;
-      mode = 600;
-      user = tikal-user;
-      group = tikal-group;
-  };
   /**
   unlock-script is a shell script executed on boot (oon the post device comands
   of the initrd stage) which will attempt to decrypt the tikal main key from
@@ -48,29 +47,62 @@ let
       template
       ./unlock.sh
       {
-        inherit tikal-main-enc tikal-paths;
+        inherit tikal-secrets tikal-user tikal-group;
         openssl = "${pkgs.openssl}/bin/openssl";
-        inherit (hardcoded) tikal-decrypt-keys-directory tikal-decrypt-master-key-file;
+        log = with-logger null;
       }
     )
   ;
+
+  tikal-main-pub =
+    get-public-file {
+      path = tikal-secrets.tikal-public-key;
+      user = tikal-user;
+      group = tikal-group;
+    }
+  ;
+
+  tikal-main-enc =
+    get-public-file {
+      path = tikal-secrets.tikal-private-key-enc;
+      mode = 600;
+      user = tikal-user;
+      group = tikal-group;
+  };
+  init-script-name = "tikal-init";
 in
   {
-    config = {
-      environment.etc = log.log-value "secret keys" {
-        ${tikal-paths.relative.tikal-main-pub} = tikal-main-pub;
-        ${tikal-paths.relative.tikal-main-enc} = tikal-main-enc;
-      };
-
-      boot.initrd = {
-        postDeviceCommands = lib.mkAfter ''
-          source ${unlock-script}
-        '';
-        extraFiles = {
-          #tikal-main-pub = tikal-main-pub;
-          #tikal-main-enc = tikal-main-enc;
+    options = {
+      tikal.core = {
+        init-script-name = mkOption {
+          type = types.str;
+          description = ''
+            The name of the activation script that initializes Tikal.
+            This can be used by other scripts to indicate they are
+            dependent on Tikal.
+          '';
+          readOnly = true;
+          default = init-script-name;
         };
       };
+    };
+    config = {
+      environment.etc = with tikal-foundations; log.log-value "secret keys" {
+        ${paths.relative.tikal-main-pub} = tikal-main-pub;
+        ${paths.relative.tikal-main-enc} = tikal-main-enc;
+      };
+
+      system.activationScripts.${init-script-name}.text = "${unlock-script}";
+
+      #boot.initrd = {
+      #  postDeviceCommands = lib.mkAfter ''
+      #    source ${unlock-script}
+      #  '';
+      #  extraFiles = {
+      #    #tikal-main-pub = tikal-main-pub;
+      #    #tikal-main-enc = tikal-main-enc;
+      #  };
+      #};
     };
   }
 

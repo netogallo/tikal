@@ -32,12 +32,20 @@ let
     "${tikal-secrets-store-directory}/${name}"
   ;
 
-  to-decrypt-script = { name, nahual, ... }:
-    secrets.to-decrypt-script {
-      inherit tikal-private-key;
-      secret = get-secret-store-path { inherit name nahual; };
-      dest = get-secret-private-path { inherit name; };
-    }
+  to-decrypt-script = { key, secret }:
+    let
+      inherit (key) name nahual;
+      set-ownership = secrets.set-ownership {
+        inherit name;
+        inherit (secret) user group;
+      };
+      post-decrypt = [ set-ownership ] ++ secret.post-decrypt;
+    in
+      secrets.to-decrypt-script {
+        inherit tikal-private-key post-decrypt;
+        secret = get-secret-store-path { inherit name nahual; };
+        dest = get-secret-private-path { inherit name; };
+      }
   ;
 
   secrets-activation-script = secrets:

@@ -1,6 +1,29 @@
 { lib, config, ... }:
 let
   inherit (lib) mkOption types;
+  post-decrypt-type = types.submodule {
+    options = {
+      name = mkOption {
+        type = types.str;
+        description = ''
+          The name of the post-decrypt script.
+        '';
+      };
+
+      text = mkOption {
+        type = types.str;
+        description = ''
+          The text of the post-decrypt script. This is a standard
+          shell script which has the following special variables
+          available in it's context:
+          - "$private": The directory containing all the private
+            values of the secret.
+          - "$public": The directory containing all the public
+            values of the secret.
+        '';
+      };
+    };
+  };
   secret.options = {
     text = mkOption {
       type = types.str;
@@ -39,6 +62,14 @@ let
         the decrypted system on the running NixOs system.
       '';
       default = null;
+    };
+
+    post-decrypt = mkOption {
+      type = types.listOf post-decrypt-type;
+      description = ''
+        Scripts that get executed after decrypting the secret.
+      '';
+      default = [];
     };
   };
   # Only add values to the config if there
