@@ -3,7 +3,7 @@ let
   inherit (lib) types mkOption;
   nahual-wireguard = types.submodule {
     options.network.wireguard = {
-      proper-endpoint = mkOption {
+      endpoint = mkOption {
         default = null;
         type = types.nullOr types.str;
         description = ''

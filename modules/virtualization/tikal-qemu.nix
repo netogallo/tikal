@@ -12,7 +12,8 @@ let
           password=$(cat "$password_file")
           export QEMU_KERNEL_PARAMS="tikal.debug.master-key=$password"
         fi
-        ${config.system.build.vm}/bin/run-${config.system.name}-vm
+        
+        ${config.system.build.vm}/bin/run-${config.system.name}-vm "$@"
         ''
       ;
     }
