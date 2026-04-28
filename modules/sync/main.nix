@@ -49,6 +49,7 @@ in
     ./config/store-lock.nix
     ./config/secrets.nix
     ./network/tor.nix
+    ./network/wireguard.nix
     ./remote-access/ssh.nix
     ./tikal-meta.nix
   ];

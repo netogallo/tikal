@@ -3,7 +3,7 @@ let
   inherit (lib) types mkOption;
   nahual-wireguard = types.submodule {
     options.network.wireguard = {
-      endpoint = mkOption {
+      proper-endpoint = mkOption {
         default = null;
         type = types.nullOr types.str;
         description = ''
@@ -13,6 +13,15 @@ let
           the nahual will be reachable by any other nahual via this endpoint. If a nahual
           is intended to act as a VPN server, this should be the public ip-address that
           the nahual is expected to have.
+        '';
+      };
+      proper-ips = mkOption {
+        default = [];
+        type = types.listOf types.str;
+        description = ''
+          The ip-addresses which this nahual is allowed to use when communicating
+          via the wireguard network. Theese ips get added to the cryptokey routing
+          tables of all other nahuales.
         '';
       };
     };
@@ -29,6 +38,13 @@ in
           wireguard network topology will be configured following the universe specified
           options.
         '';
+      };
+
+      secret-name = mkOption {
+        default = "tikal-wireguard";
+        type = types.str;
+        readOnly = true;
+        description = "The name used to refer to the wireguard related secrets.";
       };
     };
   }

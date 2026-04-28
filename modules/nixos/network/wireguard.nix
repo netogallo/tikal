@@ -24,15 +24,17 @@ let
       nahual = peer;
       name = wg-secret;
     };
+    endpoint-config =
+      if wg-config.proper-endpoint == null
+      then {}
+      else { endpoint = wg-config.proper-endpoint; }
+    ;
   in
-    if wg-config.proper-endpoint == null
-    then null
-    else
-      {
-        allowedIPs = wg-config.ips;
-        endpoint = wg-config.endpoint;
-        publicKey = builtins.readFile "${wg-public}/${wg-key-name}.pub"
-      }
+    endpoint-config //
+    {
+      allowedIPs = wg-config.proper-ips;
+      publicKey = builtins.readFile "${wg-public}/${wg-key-name}.pub";
+    }
   ;
   peers = do [
     lib.attrNames nahuales
@@ -45,12 +47,13 @@ let
   ];
 in
   {
+    imports = [ ../../shared/network/wireguard.nix ];
     config.wireguard = {
       enable = true;
       interfaces = {
         ${tikal-interface} = {
           inherit (nahual-wg) ips;
-          inherit privateKeyFile;
+          inherit privateKeyFile peers;
         };
       };
     };

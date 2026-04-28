@@ -1,6 +1,6 @@
 { ... }:
 let
-  imports = [ ../shared/network/wireguard.nix ];
+  imports = [ ../../shared/network/wireguard.nix ];
 in
   {
     inherit imports;

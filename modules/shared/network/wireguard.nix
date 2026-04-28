@@ -1,13 +1,26 @@
-{ config, universe, pkgs, lib, ... }:
+{ config, tikal, universe, pkgs, lib, ... }:
 let
   inherit (lib) types mkOption mkIf;
   inherit (pkgs) wireguard-tools;
   inherit (config.tikal.meta.nixos-context.tikal-users) tikal-root;
   secret-name = universe.config.network.wireguard.secret-name;
+  log = tikal.prelude.log.add-context { file = ./wireguard.nix; };
   key-name = "id_wg";
 
   wg-user = tikal-root.user;
   wg-group = tikal-root.group;
+
+  enable =
+    let
+      flag = universe.config.network.wireguard.enable;
+      value =
+        if flag
+        then "yes"
+        else "no"
+      ;
+    in
+      log.log-info "enable: ${value}" flag
+  ;
 
   /**
   This script generates a private/public key pair for usage
@@ -20,7 +33,7 @@ let
     wg_pkey="$private/${key-name}"
     wg_pubkey="$public/${key-name}.pub"
     ${wireguard-tools}/bin/wg genkey > "$wg_pkey"
-    cat "$wg_pkey" | ${wireguard-tools}/bin/wg pubkry > "$wg_pubkey"
+    cat "$wg_pkey" | ${wireguard-tools}/bin/wg pubkey > "$wg_pubkey"
   '';
 in
   {
@@ -44,8 +57,8 @@ in
       };
     };
 
-    config = mkIf universe.config.network.wireguard.enable {
-      secrets.all-nahuales = {
+    config = mkIf enable {
+      secrets.all-nahuales.${secret-name} = {
         text = gen-wg-key-script;
         user = wg-user;
         group = wg-group;

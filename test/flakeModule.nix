@@ -11,19 +11,26 @@ in
       universe = {
         nahuales = {
           test-s1 = {
+            network.wireguard.proper-ips = [ "10.0.0.2/24" ];
             nixos = {
               imports = [ ./tikal-test-common.nix ];
             };
           };
           test-s2 = {
+            network.wireguard.proper-ips = [ "10.0.0.3/24" ];
             nixos = {
               imports = [ ./tikal-test-common.nix ];
             };
           };
           test-root = {
+            network.wireguard = {
+              proper-ips = [ "10.0.0.1/24" ];
+              proper-endpoint = [ "192.168.48.255/24" ];
+            };
             remote-access.openssh.administrator = true;
           };
         };
+        network.wireguard.enable = true;
         network.tor.enable = true;
         remote-access.openssh.enable = true;
         universe.id = "tikal-test";
