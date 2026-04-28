@@ -11,21 +11,21 @@ in
       universe = {
         nahuales = {
           test-s1 = {
-            network.wireguard.proper-ips = [ "10.0.0.2/24" ];
+            network.wireguard.proper-ips = [ "10.0.0.2/32" ];
             nixos = {
               imports = [ ./tikal-test-common.nix ];
             };
           };
           test-s2 = {
-            network.wireguard.proper-ips = [ "10.0.0.3/24" ];
+            network.wireguard.proper-ips = [ "10.0.0.3/32" ];
             nixos = {
               imports = [ ./tikal-test-common.nix ];
             };
           };
           test-root = {
             network.wireguard = {
-              proper-ips = [ "10.0.0.1/24" ];
-              proper-endpoint = [ "192.168.48.255/24" ];
+              proper-ips = [ "10.0.0.1/32" ];
+              proper-endpoint = "192.168.48.254:51666";
             };
             remote-access.openssh.administrator = true;
           };

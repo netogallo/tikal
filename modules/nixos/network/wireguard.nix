@@ -1,5 +1,6 @@
-{ config, lib, nahual, universe, tikal, ... }:
+{ config, lib, nahual, tikal-secrets, universe, tikal, ... }:
 let
+  inherit (tikal.prelude) do;
   inherit (universe.config) nahuales;
   log = tikal.prelude.log.add-context { file = ./wireguard.nix; };
   tikal-interface = "tikal0";
@@ -10,6 +11,7 @@ let
     name = wg-secret;
   };
   privateKeyFile = "${wg-private}/${wg-key-name}";
+  tikal-wg-port = 51666;
 
   /**
   Get the wireguard peer configuration of a nahual if
@@ -39,21 +41,22 @@ let
   peers = do [
     lib.attrNames nahuales
     # The nahual must not include itself as a peer
-    "$>" lib.filter (n: n /= nahual)
+    "$>" lib.filter (n: n != nahual)
     "|>" lib.map to-wireguard-peer
     # Remove peers that cannot be initially reached
-    "|>" lib.filter (conf: conf /= null)
+    "|>" lib.filter (conf: conf != null)
     "|>" log.log-value "peers"
   ];
 in
   {
     imports = [ ../../shared/network/wireguard.nix ];
-    config.wireguard = {
+    config.networking.wireguard = {
       enable = true;
       interfaces = {
         ${tikal-interface} = {
-          inherit (nahual-wg) ips;
           inherit privateKeyFile peers;
+          listenPort = tikal-wg-port;
+          ips = nahual-wg.proper-ips;
         };
       };
     };

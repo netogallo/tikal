@@ -28,6 +28,9 @@ let
   };
 in
   {
+    options.nahuales = mkOption {
+      type = types.attrsOf nahual-wireguard;
+    };
     options.network.wireguard = {
       enable = mkOption {
         default = false;
