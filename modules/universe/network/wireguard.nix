@@ -3,6 +3,27 @@ let
   inherit (lib) types mkOption;
   nahual-wireguard = types.submodule {
     options.network.wireguard = {
+
+      forwarding = {
+        enable = mkOption {
+          default = false;
+          type = types.bool;
+          description = ''
+            Enables traffic forwarding on the network interface running the
+            wireguard server. The main use case is running a VPN server.
+          '';
+        };
+      };
+
+      listen-port = mkOption {
+        default = null;
+        type = types.nullOr types.int;
+        description = ''
+          Explicitly specify the port which will be used by the
+          wireguard interface to listen for incomming connections.
+        '';
+      };
+
       proper-endpoint = mkOption {
         default = null;
         type = types.nullOr types.str;
@@ -15,6 +36,7 @@ let
           the nahual is expected to have.
         '';
       };
+
       proper-ips = mkOption {
         default = [];
         type = types.listOf types.str;
@@ -23,6 +45,18 @@ let
           via the wireguard network. Theese ips get added to the cryptokey routing
           tables of all other nahuales.
         '';
+      };
+
+      peers = {
+        nahuales = mkOption {
+          default = [];
+          type = types.listOf types.str;
+          description = ''
+            The nahuales that will be added to the list of peers of this nahual.
+            Note that this implies that this nahual will also be added as a peer
+            of the nahuales in this list.
+          '';
+        };
       };
     };
   };
