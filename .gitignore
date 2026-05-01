@@ -4,3 +4,4 @@ xonshrc
 scratch/
 .env
 .aider*
+.nixos-test-history
