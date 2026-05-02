@@ -33,7 +33,15 @@ let
     endpoint-config =
       if wg-config.proper-endpoint == null
       then {}
-      else { endpoint = wg-config.proper-endpoint; }
+      else {
+        endpoint = wg-config.proper-endpoint;
+
+        # Todo, this should be configuratble. In general,
+        # it might be best to refactor tikal such that
+        # all theese settings are exposed by enriching the
+        # exisitng wireguard options
+        persistentKeepalive = 25; 
+      }
     ;
   in
     endpoint-config //
