@@ -130,7 +130,7 @@ let
   nix-crypto plugin enabled.
   */
   mk-if-crypto = value:
-    if crypto.enabled
+    if true #crypto.enabled
     then value
     else {}
   ;
