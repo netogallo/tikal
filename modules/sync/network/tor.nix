@@ -1,7 +1,7 @@
-{ lib, ... }:
+{ ... }:
 let
-  inherit (lib) mkIf;
+  imports = [ ../../shared/network/tor.nix ];
 in
   {
-    imports = [ ../../shared/network/tor.nix ];
+    inherit imports;
   }

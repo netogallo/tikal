@@ -6,6 +6,7 @@ in
   imports = [
     ./context.nix
     ./members.nix
+    ./network/wireguard.nix
     ./network/tor.nix
     ./remote-access/ssh.nix
   ];

@@ -2,3 +2,6 @@ result
 xonshrc
 *.qcow2
 scratch/
+.env
+.aider*
+.nixos-test-history

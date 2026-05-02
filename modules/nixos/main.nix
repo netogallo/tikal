@@ -9,6 +9,7 @@ in
       ./config/secrets.nix
       ./system/unlock.nix
       ./network/tor.nix
+      ./network/wireguard.nix
       ./remote-access/ssh.nix
       ../platforms/platforms.nix
     ];
