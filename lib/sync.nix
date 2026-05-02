@@ -142,6 +142,7 @@ in
       } //
       {
         inherit tikal-sync-nix-crypto-package;
+        tikal-nix-crypto = nix-crypto-tikal;
       }
     ;
     apps =
