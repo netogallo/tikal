@@ -15,6 +15,17 @@ try_get_passphrase_from_cmdline() {
   return $success
 }
 
+try_get_passphrase_from_filesystem() {
+  PASSPHRASE_FILE="/var/tikal/id_master_passphrase"
+
+  if [ -f "$PASSPHRASE_FILE" ]; then
+    cat "$PASSPHRASE_FILE"
+    return 0
+  fi
+
+  return 1
+}
+
 decrypt_tikal_master_key() {
   TMP_KEY=$(mktemp)
   
@@ -48,20 +59,33 @@ decrypt_main() {
   if [[ "$success" == 0 ]]; then
     decrypt_tikal_master_key "$PASSPHRASE"
     success="$?"
-  else
-    echo "This Tikal image has not been unlocked. Please enter the unlock key when prompted"
-    success="1"
   fi
 
+  if [[ "$success" != 0 ]]; then
+    PASSPHRASE="$(try_get_passphrase_from_filesystem)"
+    success="$?"
+
+    if [[ "$success" == 0 ]]; then
+      decrypt_tikal_master_key "$PASSPHRASE"
+      success="$?"
+    fi
+  fi
+
+  if [[ "$success" != 0 ]]; then
+    echo "This Tikal image has not been unlocked. Please enter the unlock key when prompted"
+  fi
+
+  attempts=0
   while [[ "$success" != "0" ]]; do
+    if [[ "$attempts" -ge 10 ]]; then
+      ${log} --tag=unlock -d "Unlocking failed. Tikal functionality will be unavailable."
+      return 1
+    fi
+
     read -sr -p "Enter master key passphrase: " PASSPHRASE
     decrypt_tikal_master_key "$PASSPHRASE"
     success="$?"
-
-    if [[ "$success" == "0" ]]; then
-      read -sr -p "Press enter to continue: " X
-      echo "$X"
-    fi
+    attempts=$((attempts + 1))
   done
 }
 
