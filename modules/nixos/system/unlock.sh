@@ -79,7 +79,7 @@ decrypt_main() {
   while [[ "$success" != "0" ]]; do
     if [[ "$attempts" -ge 10 ]]; then
       ${log} --tag=unlock -d "Unlocking failed. Tikal functionality will be unavailable."
-      return 1
+      return 0
     fi
 
     read -sr -p "Enter master key passphrase: " PASSPHRASE
