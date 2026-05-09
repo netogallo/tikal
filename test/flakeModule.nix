@@ -31,7 +31,10 @@ in
                 peers.nahuales = [ "test-s1" "test-root" ];
               };
               nixos = {
-                imports = [ ./tikal-test-common.nix ];
+                imports = [
+                  ./tikal-test-common.nix
+                  ./test-s2.nix
+                ];
               };
             };
             test-root = {
@@ -40,6 +43,9 @@ in
               };
               remote-access.openssh.administrator = true;
             };
+          };
+          security.certificates = {
+            user-1 = {};
           };
           network.wireguard.enable = true;
           network.tor.enable = true;
