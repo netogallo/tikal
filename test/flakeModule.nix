@@ -9,7 +9,7 @@ in
     config = {
       tikal = {
         flake-root = ../.;
-        universe-repository = "git+https://github.com/netogallo/tikal.git?ref=feature/with-cryptonix";
+        universe-repository = "git+https://github.com/netogallo/tikal.git?ref=main";
         universe = {
           nahuales = {
             test-s1 = {

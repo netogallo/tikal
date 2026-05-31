@@ -8,9 +8,11 @@ in
 
         # Export the private-key of user-1 to
         # the specified locations.
-        private-key = [
-          ".config/user-1.key"
-        ];
+        private-key = {
+          target-files = [
+            ".config/user-1.key"
+          ];
+        };
       };
     };
   }
