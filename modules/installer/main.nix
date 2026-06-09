@@ -26,7 +26,6 @@ in
         installer-package
       ];
       networking.networkmanager.enable = true;
-      networking.wireless.enable = false;
     };
   }
 

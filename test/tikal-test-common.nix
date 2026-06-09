@@ -1,4 +1,4 @@
 { config, lib, pkgs, ... }:
 {
-  config.environment.systemPackages = [ pkgs.neofetch ];
+  config.environment.systemPackages = [ pkgs.fastfetch ];
 }

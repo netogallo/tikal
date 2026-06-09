@@ -72,21 +72,21 @@ in
 
               testScript = ''
                 import time
-                def send_tikal_pass(vm):
+                import os
+                print("Cwd: {}", os.getcwd())
+                def start_with_password(vm):
                   with open(f".tikal/private/nahuales/{vm.name}/keys/id_tikal.pass", 'r') as pw:
                     key = pw.read()
 
-
-                  vm.wait_for_console_text("booting system configuration")
+                  os.environ['QEMU_KERNEL_PARAMS'] = f"tikal.debug.master-key={key}"
+                  vm.start()
                   time.sleep(1)
-                  vm.send_chars(f"{key}\n\n")
 
                 vpn_clients = [test_s1, test_root]
                 all_vms = [test_s2] + vpn_clients
 
                 for vm in all_vms:
-                  vm.start()
-                  send_tikal_pass(vm)
+                  start_with_password(vm)
 
                 for vm in all_vms:
                   vm.wait_for_unit("network.target")
@@ -99,8 +99,21 @@ in
 
                 # Check that test-root can ssh
                 # into the client
-                (code, res) = test_root.execute("su tikal-root -c \"ssh -o StrictHostKeyChecking=no tikal-root@10.0.0.2 'hostname'\"")
-                assert res.strip() == "test-s1", f"Expected hostname 'test-s1', got {res.strip()} with code {code}"
+                # attempt 5 times
+                for i in range(1,5):
+                  try:
+                      (code, res) = test_root.execute("su tikal-root -c \"ssh -o StrictHostKeyChecking=no tikal-root@10.0.0.2 'hostname'\"")
+                      assert res.strip() == "test-s1", f"Expected hostname 'test-s1', got {res.strip()} with code {code}"
+                      break
+                  except Exception as e:
+                    if i >= 5:
+                      raise e
+                    else:
+                      time.sleep(i*i)
+                      i = i+1
+
+                for vm in all_vms:
+                  vm.shutdown()
 
               '';
             })

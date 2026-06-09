@@ -83,8 +83,14 @@ decrypt_main() {
     fi
 
     read -sr -p "Enter master key passphrase: " PASSPHRASE
-    decrypt_tikal_master_key "$PASSPHRASE"
-    success="$?"
+    read_result="$?"
+
+    if [[ "$read_result" == "0" ]]; then
+      decrypt_tikal_master_key "$PASSPHRASE"
+      success="$?"
+    else
+      ${log} --tag=unlock -d "Read failed with: $read_result"
+    fi;
     attempts=$((attempts + 1))
   done
 }

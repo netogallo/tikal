@@ -2,7 +2,7 @@
   description = "A very basic flake";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixos-rockchip.url = "github:netogallo/nixos-rockchip?ref=feature/opi5b-linux-lts";
     flake-parts.url = "github:hercules-ci/flake-parts";
     nix-crypto.url = "github:netogallo/nix-crypto/main";
