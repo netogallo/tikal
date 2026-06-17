@@ -43,5 +43,13 @@ in
         settings.PasswordAuthentication = false;
       };
       users.users.${tikal-root.user}.openssh.authorizedKeys.keyFiles = public-ssh-keys;
+
+      networking.nftables.firewall = {
+        rules.tikal-ssh = {
+          from = ["all"];
+          to = ["fw"];
+          allowedTCPPorts = [22];
+        };
+      };
     };
   }

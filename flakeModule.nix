@@ -1,7 +1,7 @@
 { tikal-flake, ... }: { self, lib, config, flake-parts-lib, ... }:
 let
   inherit (tikal-flake.inputs) nixpkgs nixos-rockchip
-    nix-crypto;
+    nix-crypto nnf;
   inherit (flake-parts-lib)
     mkPerSystemOption;
   inherit (lib) mkOption types;
@@ -10,7 +10,7 @@ let
   call-tikal-package = module: context:
     lib.callPackageWith
     {
-      inherit lib nixpkgs nixos-rockchip nix-crypto;
+      inherit lib nixpkgs nixos-rockchip nix-crypto nnf;
     }
     module
     (config.tikal // context)

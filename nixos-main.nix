@@ -3,6 +3,7 @@
   lib,
   universe,
   nixos-rockchip,
+  nnf,
   ...
 }@inputs:
 let
@@ -23,7 +24,10 @@ let
       });
     in
       {
-        imports = [ ./modules/nixos/main.nix nixos ];
+        imports = [
+          ./modules/nixos/main.nix nixos
+          nnf.nixosModules.default
+        ];
         config._module.args = {
           inherit nixos-rockchip;
           # Todo: if the whole "nixos-scope.args" is used. It
