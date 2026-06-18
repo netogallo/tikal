@@ -74,14 +74,14 @@ let
     "|>" log.log-value "peers"
   ];
   wg-listen = {
-    from = ["all"];
+    from = "all";
     to = ["fw"];
-    allowedUDPPorts = [22];
+    allowedUDPPorts = [nahual-wg.listen-port];
   };
   tikal-wg-forward = {
-    from = ["all"];
+    from = "all";
     to = ["tikal-wg"];
-    veredict = "accept";
+    verdict = "accept";
   };
 in
   {
@@ -99,23 +99,24 @@ in
           };
         };
 
-      networking.nftables.firewall = {
-        zones.tikal-wg = {
-          interfaces = [ tikal-interface ];
-        };
+        nftables.firewall = {
+          zones.tikal-wg = {
+            interfaces = [ tikal-interface ];
+          };
 
-        rules =
-          (
-            if (nahual-wg.listen-port != null)
-            then { inherit wg-listen; }
-            else {}
-          ) //
-          (
-            if (nahual-wg.forwarding.enable)
-            then { inherit tikal-wg-forward; }
-            else {}
-          )
-        ;
+          rules =
+            (
+              if (nahual-wg.listen-port != null)
+              then { inherit wg-listen; }
+              else {}
+            ) //
+            (
+              if (nahual-wg.forwarding.enable)
+              then { inherit tikal-wg-forward; }
+              else {}
+            )
+          ;
+        };
       };
 
       #  firewall = {

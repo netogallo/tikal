@@ -6,7 +6,7 @@ in
     config = {
       networking.nftables.firewall = {
         enable = true;
-        snippets.nnf-common.enable = false;
+        snippets.nnf-common.enable = true;
       };
     };
   }

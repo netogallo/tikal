@@ -46,7 +46,7 @@ in
 
       networking.nftables.firewall = {
         rules.tikal-ssh = {
-          from = ["all"];
+          from = "all";
           to = ["fw"];
           allowedTCPPorts = [22];
         };
