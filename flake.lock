@@ -171,12 +171,28 @@
         "type": "github"
       }
     },
+    "nnf": {
+      "locked": {
+        "lastModified": 1774778550,
+        "narHash": "sha256-sz7uRra2VvVm5OV3hUiS2X9ePceTVRLyzKNU5VAHp+k=",
+        "owner": "thelegy",
+        "repo": "nixos-nftables-firewall",
+        "rev": "85e1a85ef9a15419ee9ed06db9c86204c7897bce",
+        "type": "github"
+      },
+      "original": {
+        "owner": "thelegy",
+        "repo": "nixos-nftables-firewall",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "flake-parts": "flake-parts",
         "nix-crypto": "nix-crypto",
         "nixos-rockchip": "nixos-rockchip",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs_2",
+        "nnf": "nnf"
       }
     },
     "systems": {

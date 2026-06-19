@@ -6,6 +6,7 @@
     nixos-rockchip.url = "github:netogallo/nixos-rockchip?ref=feature/opi5b-linux-lts";
     flake-parts.url = "github:hercules-ci/flake-parts";
     nix-crypto.url = "github:netogallo/nix-crypto/main";
+    nnf.url = "github:thelegy/nixos-nftables-firewall";
   };
 
   outputs = inputs@{ self, flake-parts, ... }:

@@ -73,6 +73,16 @@ let
     "$>" lib.filter (conf: conf != null)
     "|>" log.log-value "peers"
   ];
+  wg-listen = {
+    from = "all";
+    to = ["fw"];
+    allowedUDPPorts = [nahual-wg.listen-port];
+  };
+  tikal-wg-forward = {
+    from = "all";
+    to = ["tikal-wg"];
+    verdict = "accept";
+  };
 in
   {
     imports = [ ../../shared/network/wireguard.nix ];
@@ -89,11 +99,23 @@ in
           };
         };
 
-        firewall = {
-          allowedUDPPorts = mkIf (nahual-wg.listen-port != null) [ nahual-wg.listen-port ];
-          extraForwardRules = mkIf nahual-wg.forwarding.enable ''
-            iifname "${tikal-interface}" oifname "${tikal-interface}" accept
-          ''; 
+        nftables.firewall = {
+          zones.tikal-wg = {
+            interfaces = [ tikal-interface ];
+          };
+
+          rules =
+            (
+              if (nahual-wg.listen-port != null)
+              then { inherit wg-listen; }
+              else {}
+            ) //
+            (
+              if (nahual-wg.forwarding.enable)
+              then { inherit tikal-wg-forward; }
+              else {}
+            )
+          ;
         };
       };
 

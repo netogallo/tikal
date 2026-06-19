@@ -5,6 +5,7 @@ let
 in
   {
     imports = [
+      ./config/basis.nix
       ./tikal-meta.nix
       ./config/secrets.nix
       ./system/unlock.nix
