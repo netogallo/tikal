@@ -7,12 +7,15 @@
   ...
 }:
 let
-  nix-crypto-scope = lib.makeScope newScope (self: {
-    # lib = { universe }: self.callPackage ./crypto/default.nix { inherit universe; };
-    nix-crypto-lib = self.callPackage "${nix-crypto-flake}/crypto/default.nix" {};
-  });
+  nix-crypto-dist = (pkgs.extend nix-crypto-flake.overlays.default).nix-crypto;
+  nix-crypto-lib = nix-crypto-dist.lib;
+  # nix-crypto-scope = lib.makeScope newScope (self: {
+  #   # lib = { universe }: self.callPackage ./crypto/default.nix { inherit universe; };
+  #   nix-crypto-lib = self.callPackage "${nix-crypto-flake}/crypto/default.nix" {};
+  # });
   enabled = lib.hasAttr "crypto" builtins;
-  inherit (nix-crypto-flake.packages.${pkgs.stdenv.system}) nix-crypto nix-crypto-service;
+  #inherit (nix-crypto-flake.packages.${pkgs.stdenv.system}) nix-crypto nix-crypto-service;
+  inherit (nix-crypto-dist) nix-crypto nix-crypto-service;
   nix-crypto-tikal = { nix-crypto-store }:
     pkgs.writeShellScriptBin
     "nix"
@@ -47,7 +50,7 @@ let
   ;
 in
   lib-when-enabled {
-    inherit (nix-crypto-scope) nix-crypto-lib;
+    inherit nix-crypto-lib;
   } //
   {
     inherit nix-crypto-tikal tikal-crypto-cli;

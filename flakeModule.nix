@@ -1,4 +1,4 @@
-{ tikal-flake, ... }: { self, lib, config, flake-parts-lib, ... }:
+{ tikal-flake, tikal-prelude, ... }: { self, lib, config, flake-parts-lib, ... }:
 let
   inherit (tikal-flake.inputs) nixpkgs nixos-rockchip
     nix-crypto nnf;
@@ -11,6 +11,10 @@ let
     lib.callPackageWith
     {
       inherit lib nixpkgs nixos-rockchip nix-crypto nnf;
+      tikal = {
+        lib = self.lib.tikal;
+        overlay = self.overlays.tikal-prelude;
+      };
     }
     module
     (config.tikal // context)
@@ -27,6 +31,10 @@ let
   };
 in
 {
+  imports = [
+    #tikal-prelude.flakeModules.default
+    "${tikal-prelude}/flakeModule.nix"
+  ];
   config.flake = {
     inherit (tikal-nixos-main) nixosModules;
     lib.tikal = {
@@ -67,35 +75,6 @@ in
         type = types.path;
       };
 
-      log-level = lib.mkOption {
-        description = ''
-          The log verbosity of the output when evaluating the tikal code. Normally,
-          this should be left unchanged but can be used when modifying the tikal
-          code for debugging. The loglevels are as follows:
-            * debug-verbose = 8
-            * debug = 7
-            * info = 6
-            * warning = 5
-            * error = 4
-            * no logs = < 4
-        '';
-        type = types.enum [ 0 1 2 3 4 5 6 7 8 ];
-        default = 0;
-      };
-      test-filters = lib.mkOption {
-        description = ''
-          The tests for Tikal can run automatically as tikal code gets evaluated. This allows
-          developers to easily asess if new changes break any tests. However, this can
-          incurr a performance penalty, therefore a filter can be used to determine what
-          tests are to be run. The filter is a "glob" string and the test will run if
-          the name of the test matches any glob. This means that:
-            test-filters = [ "*" ]
-          implies that all tests will run every time Tika's nix code gets evaluated.
-        '';
-        default = [];
-        type = types.listOf (types.oneOf [ types.str glob-type ]);
-      };
-
       universe = lib.mkOption {
         description = ''
           This option allows the user to describe the general topology of the universe
@@ -132,9 +111,10 @@ in
 
     perSystem = mkPerSystemOption ({ pkgs, system, ... }:
     let
-      sync = call-tikal-package ./sync-main.nix { inherit pkgs system; };
-      vms = tikal-nixos-main.vms { inherit pkgs; };
-      installer = call-tikal-package ./install-main.nix { inherit pkgs system; };
+      pkgs' = pkgs.extend self.overlays.tikal-prelude;
+      sync = call-tikal-package ./sync-main.nix { inherit system; pkgs = pkgs'; };
+      vms = tikal-nixos-main.vms { pkgs = pkgs'; };
+      installer = call-tikal-package ./install-main.nix { inherit system; pkgs = pkgs'; };
       get-config-attrs = { packages ? {}, apps ? {}, ... }:
         { inherit packages apps; }
       ;

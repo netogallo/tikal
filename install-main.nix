@@ -10,6 +10,7 @@ nahuales defined in the universe.
   universe,
   lib,
   nixpkgs,
+  tikal,
   ...
 }@inputs:
 let

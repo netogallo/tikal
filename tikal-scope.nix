@@ -4,6 +4,7 @@
   universe,
   flake-root,
   sync,
+  tikal,
   base-dir ? null,
   universe-repository ? null,
   log-level ? 1,
@@ -25,7 +26,7 @@ let
   base-scope = lib.makeScope lib.callPackageWith (self: {
     inherit nixpkgs tikal-config lib;
     tikal = {
-      prelude = self.callPackage ./lib/prelude.nix {};
+      prelude = tikal.lib.prelude;
       hardcoded = self.callPackage ./lib/hardcoded.nix {};
     };
   });
@@ -62,6 +63,7 @@ let
   # it offers much more functionality which depends on pkgs.
   full-scope = { pkgs, nixos-rockchip, nix-crypto ? null }:
     let
+      pkgs' = pkgs.extend tikal.overlay;
       tikal-scopes = {
         full-scope = { pkgs }: full-scope { inherit pkgs nixos-rockchip; };
       };
@@ -71,13 +73,14 @@ let
         inherit (universe-scope) universe nixpkgs shared-context flake-context sync-context;
         tikal-config = log.log-value "tikal-config" tikal-config;
         tikal = {
-          prelude = self.callPackage ./lib/prelude.nix {};
+          #prelude = self.callPackage ./lib/prelude.nix {};
+          prelude = pkgs'.tikal.prelude;
           hardcoded = self.callPackage ./lib/hardcoded.nix {};
-          xonsh = self.callPackage ./lib/xonsh.nix {};
+          #xonsh = self.callPackage ./lib/xonsh.nix {};
           sync = self.callPackage ./lib/sync/lib.nix {};
           store = self.callPackage ./lib/store.nix {};
           syslog = self.callPackage ./lib/syslog.nix {};
-          template = self.callPackage ./lib/template.nix {};
+          #template = self.callPackage ./lib/template.nix {};
           platforms = self.callPackage ./lib/platforms.nix { inherit nixos-rockchip; };
           test-utils = self.callPackage ./lib/test-utils.nix { inherit universe-scope; };
           crypto = self.callPackage ./lib/crypto.nix { nix-crypto-flake = nix-crypto; };

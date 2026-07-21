@@ -5,16 +5,18 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixos-rockchip.url = "github:netogallo/nixos-rockchip?ref=feature/opi5b-linux-lts";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    nix-crypto.url = "github:netogallo/nix-crypto/main";
+    #nix-crypto.url = "github:netogallo/nix-crypto/main";
+    nix-crypto.url = "github:netogallo/nix-crypto";
     nnf.url = "github:thelegy/nixos-nftables-firewall";
+    tikal-prelude.url = "github:netogallo/tikal-prelude";
   };
 
-  outputs = inputs@{ self, flake-parts, ... }:
+  outputs = inputs@{ self, flake-parts, tikal-prelude, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } ({ withSystem, flake-parts-lib, ... }:
     let
       inherit (flake-parts-lib) importApply;
       flakeModules.default =
-        importApply ./flakeModule.nix { inherit withSystem; tikal-flake = self; };
+        importApply ./flakeModule.nix { inherit withSystem tikal-prelude; tikal-flake = self; };
     in
     {
       imports = [

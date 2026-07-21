@@ -6,6 +6,7 @@
   nixos-rockchip,
   pkgs,
   nix-crypto,
+  tikal,
   ...
 }@inputs:
 let

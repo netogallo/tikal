@@ -1,5 +1,5 @@
 # Ensure commands that don't exit with 0 status fail.
-$RAISE_SUBPROC_ERROR=True
+$XONSH_SUBPROC_CMD_RAISE_ERROR=True
 
 from os import path
 import json

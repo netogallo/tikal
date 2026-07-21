@@ -5,3 +5,4 @@ scratch/
 .env
 .aider*
 .nixos-test-history
+.local

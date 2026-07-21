@@ -3,7 +3,7 @@ let
   universe-module = universe;
   inherit (tikal.prelude) do store-path-to-key;
   inherit (tikal.prelude.python) is-valid-python-identifier store-path-to-python-identifier;
-  inherit (tikal.xonsh) xsh;
+  inherit (tikal.prelude.xonsh) xsh;
   inherit (tikal.prelude) test;
   inherit (tikal.prelude.attrs) merge-disjoint map-attrs-with;
   inherit (tikal.test-utils) mocks;

@@ -23,8 +23,8 @@ to accomodate both scenarios.
 let
   inherit (tikal-nixos-context.tikal-secrets) tikal-private-key tikal-secrets-store-directory;
   inherit (tikal) hardcoded;
-  inherit (tikal.template) template template-nix;
-  inherit (tikal.xonsh) xsh;
+  inherit (tikal.prelude.template) template template-nix;
+  inherit (tikal.prelude.xonsh) xsh;
   log = tikal.prelude.log.add-context { file = ./tikal-installer.nix; };
   rootfs = {
     partuuid = "9ddbbf04-f472-4ba9-9142-245f8391decc";

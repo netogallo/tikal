@@ -3,7 +3,7 @@ This module contains configuration which is common to all rockchip platforms.
 */
 { tikal, lib, ... }:
 let
-  inherit (tikal.xonsh) xsh;
+  inherit (tikal.prelude.xonsh) xsh;
   log = tikal.prelude.log.add-context { file = ./shared.nix; };
   uboot-installer-package = { uboot-image }: xsh.write-shell-script {
     name = "install_rockchip_uboot";

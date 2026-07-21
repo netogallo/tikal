@@ -4,6 +4,7 @@
   universe,
   nixos-rockchip,
   nnf,
+  tikal,
   ...
 }@inputs:
 let

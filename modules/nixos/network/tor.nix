@@ -1,7 +1,7 @@
 { lib, config, tikal, tikal-secrets, universe, nahual, pkgs, ... }:
 let
   inherit (tikal.prelude) do;
-  inherit (tikal.xonsh) xsh;
+  inherit (tikal.prelude.xonsh) xsh;
   inherit (lib) mkIf;
   inherit (config.tikal.meta.nixos-context.tikal-users) tikal-root;
   inherit (config.tikal.meta) nahuales;

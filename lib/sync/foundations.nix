@@ -1,6 +1,6 @@
 { sync-module, tikal, writeTextFile, ... }:
 let
-  inherit (tikal.xonsh) xsh;
+  inherit (tikal.prelude.xonsh) xsh;
   gitignore = writeTextFile {
     name = ".gitignore";
     text = ''

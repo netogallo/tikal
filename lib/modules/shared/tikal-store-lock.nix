@@ -24,8 +24,8 @@ let
   '';
   inherit (tikal.prelude) do test debug-print;
   inherit (tikal.sync) nahual-sync-script sync-script sync-script-tests;
-  inherit (tikal.template) template;
-  inherit (tikal.xonsh) xsh;
+  inherit (tikal.prelude.template) template;
+  inherit (tikal.prelude.xonsh) xsh;
   inherit (lib) types mkIf mkOption;
   inherit (tikal.store.lock) get-resource-path hash-key lockfile-name
     lockdir-name lockstore-name;

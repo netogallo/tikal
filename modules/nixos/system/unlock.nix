@@ -27,7 +27,7 @@ Currently, the following methods are supported to make the private key available
 let
   inherit (lib) mkOption types;
   inherit (tikal.prelude) path;
-  inherit (tikal.template) template;
+  inherit (tikal.prelude.template) template;
   inherit (config.tikal.meta.nixos-context) tikal-secrets;
   inherit (config.tikal.meta.nixos-context.tikal-users) tikal-root;
   inherit (tikal-nixos) get-public-file;

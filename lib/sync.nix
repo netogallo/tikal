@@ -12,7 +12,7 @@
 }:
 let
   inherit (tikal.prelude) do;
-  inherit (tikal.xonsh) xsh;
+  inherit (tikal.prelude.xonsh) xsh;
   inherit (tikal.sync) sync-lib;
   inherit (tikal) crypto;
 

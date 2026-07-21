@@ -1,7 +1,7 @@
 { sync-module, openssh, age, expect, tikal, ... }:
 let
-  inherit (tikal.xonsh) xsh;
-  inherit (tikal.template) template;
+  inherit (tikal.prelude.xonsh) xsh;
+  inherit (tikal.prelude.template) template;
 in
 {
   script = xsh.write-script {
