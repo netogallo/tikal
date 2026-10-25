@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
-    nixos-rockchip.url = "github:netogallo/nixos-rockchip?ref=feature/opi5b-linux-lts";
+    nixos-rockchip.url = "github:netogallo/nixos-rockchip?ref=main";
     flake-parts.url = "github:hercules-ci/flake-parts";
     #nix-crypto.url = "github:netogallo/nix-crypto/main";
     nix-crypto.url = "github:netogallo/nix-crypto";
