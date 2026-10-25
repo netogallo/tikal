@@ -45,6 +45,27 @@ in
           network.tor.enable = true;
           remote-access.openssh.enable = true;
           universe.id = "tikal-test";
+          credentials = {
+            asymmetric-keys = {
+              test-s1-key = {
+                type = "RSA/4096";
+              };
+            };
+            x509-certificates = {
+              subjecct-public-key = "test-s1-key";
+              subject-name = "/CN=test.com";
+              issuer-name = "/CN=universe-root-ca";
+              start-date = "2026-07-23T00:00:00Z";
+              expiry-date = "2036-07-23T00:00:00Z";
+              basic-constraints = {
+                critical = true;
+                ca = false;
+              };
+              key-usage = {
+                critical = true;
+              };
+            };
+          };
         };
         log-level = 7;
         test-filters = [ { glob = "*"; } ];
